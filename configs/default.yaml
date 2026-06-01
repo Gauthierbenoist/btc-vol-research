@@ -12,6 +12,7 @@ market:
 
 calibration:
   atm_log_moneyness_sigma: 0.15
+  atm_zone_half_width: 0.10   # |log(K/F)| <= w => ATM ; au-delà => ailes
   use_vega_weight: true
   use_liquidity_weight: true
   min_strikes_per_slice: 5

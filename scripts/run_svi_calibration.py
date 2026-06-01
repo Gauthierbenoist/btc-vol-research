@@ -22,8 +22,16 @@ from btc_vol_research.models.svi.calibrate import calibrate_all_slices  # noqa: 
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness  # noqa: E402
 from btc_vol_research.surfaces.plots import (  # noqa: E402
     plot_calibration_fit,
+    plot_mark_vs_mid,
+    plot_svi_rmse_by_zone,
+    plot_svi_rmse_zones_heatmap,
     plot_svi_rho_term_structure,
     plot_svi_surface,
+)
+from btc_vol_research.analysis.iv_diagnostics import (  # noqa: E402
+    mark_vs_mid_summary,
+    mark_vs_mid_table,
+    svi_rmse_by_zone,
 )
 from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table  # noqa: E402
 from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid, surface_to_long_dataframe  # noqa: E402
@@ -83,6 +91,28 @@ def main() -> int:
     ts.to_csv(rho_csv, index=False)
     rho_path = plot_svi_rho_term_structure(results_all, cfg.figures_dir, snap_str)
     print(f"rho(T) : {rho_path.name} ({len(results_all)} points) | CSV : {rho_csv.name}")
+
+    atm_w = cfg.calibration.atm_zone_half_width
+    mark_mid = mark_vs_mid_table(panel, atm_w)
+    mark_mid_sum = mark_vs_mid_summary(panel, atm_w)
+    svi_zones = svi_rmse_by_zone(results_all, atm_w)
+    diag_dir = cfg.reports_dir
+    mark_mid.to_csv(diag_dir / f"mark_vs_mid_by_zone_{snap_str}.csv", index=False)
+    mark_mid_sum.to_csv(diag_dir / f"mark_vs_mid_summary_{snap_str}.csv", index=False)
+    svi_zones.to_csv(diag_dir / f"svi_rmse_by_zone_{snap_str}.csv", index=False)
+    plot_mark_vs_mid(panel, cfg.figures_dir, snap_str, atm_w)
+    plot_svi_rmse_by_zone(svi_zones, cfg.figures_dir, snap_str)
+    plot_svi_rmse_zones_heatmap(svi_zones, cfg.figures_dir, snap_str)
+    print("\n=== mark_iv vs iv_mid (moyenne par zone) ===")
+    print(mark_mid_sum.to_string(index=False))
+    print("\n=== RMSE SVI par zone (moyenne sur maturites) ===")
+    print(
+        svi_zones.groupby("zone")[["rmse_svi", "bias_model_minus_mkt"]]
+        .mean()
+        .assign(rmse_svi_pct=lambda d: d["rmse_svi"] * 100)
+        .to_string()
+    )
+    print(f"\nDiagnostics : mark_vs_mid_{snap_str}.png, svi_rmse_by_zone_{snap_str}.png")
 
     for r in results_plots:
         g = panel.loc[panel["slice_id"] == r.slice_id].sort_values("log_moneyness")
