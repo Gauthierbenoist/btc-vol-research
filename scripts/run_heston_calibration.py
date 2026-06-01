@@ -1,0 +1,68 @@
+#!/usr/bin/env python
+"""Calibration Heston pondérée par maturité (Neon → smiles)."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from datetime import date
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+SRC = ROOT / "src"
+if str(SRC) not in sys.path:
+    sys.path.insert(0, str(SRC))
+
+from btc_vol_research.config import load_config  # noqa: E402
+from btc_vol_research.data.loader import load_snapshot  # noqa: E402
+from btc_vol_research.data.panel import build_market_panel  # noqa: E402
+from btc_vol_research.models.heston.calibrate import calibrate_all_slices  # noqa: E402
+from btc_vol_research.surfaces.plots import plot_calibration_fit  # noqa: E402
+from btc_vol_research.analysis.report import write_calibration_report  # noqa: E402
+from btc_vol_research.analysis.metrics import calibration_summary_table  # noqa: E402
+
+
+def parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(description="Calibration Heston sur données Neon")
+    p.add_argument("--date", type=str, help="YYYY-MM-DD")
+    p.add_argument("--max-slices", type=int, default=6, help="Nombre max de maturités à calibrer")
+    return p.parse_args()
+
+
+def main() -> int:
+    args = parse_args()
+    cfg = load_config()
+    snap = date.fromisoformat(args.date) if args.date else None
+    if snap is None and cfg.snapshot_date:
+        snap = date.fromisoformat(str(cfg.snapshot_date))
+
+    raw = load_snapshot(snap)
+    snapshot_date = raw["snapshot_date"].iloc[0]
+    snap_str = str(snapshot_date)
+    panel = build_market_panel(raw, cfg)
+
+    # Tranches les plus liquides (plus de strikes)
+    counts = panel.groupby("slice_id").size().sort_values(ascending=False)
+    keep = counts.head(args.max_slices).index.tolist()
+    panel_sub = panel.loc[panel["slice_id"].isin(keep)].copy()
+
+    results = calibrate_all_slices(panel_sub, cfg)
+    if not results:
+        print("Aucune tranche calibrée — vérifiez les filtres ou MIN strikes.", file=sys.stderr)
+        return 1
+
+    table = calibration_summary_table(results)
+    report_path = write_calibration_report(results, cfg.reports_dir, snap_str)
+    print(table.to_string(index=False))
+    print(f"\nRapport: {report_path}")
+
+    for r in results:
+        g = panel_sub.loc[panel_sub["slice_id"] == r.slice_id].sort_values("log_moneyness")
+        plot_calibration_fit(g, r.model_iv, cfg.figures_dir, snap_str, r.slice_id)
+        print(f"  {r.slice_id}: RMSE IV={r.rmse_iv:.4f} (pondéré {r.weighted_rmse_iv:.4f})")
+
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
