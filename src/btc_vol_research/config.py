@@ -58,12 +58,22 @@ class HestonBounds:
 
 
 @dataclass(frozen=True)
+class SVIBounds:
+    a: tuple[float, float] = (0.0, 5.0)
+    b: tuple[float, float] = (0.0, 5.0)
+    rho: tuple[float, float] = (-0.999, 0.999)
+    m: tuple[float, float] = (-1.5, 1.5)
+    sigma: tuple[float, float] = (0.01, 2.0)
+
+
+@dataclass(frozen=True)
 class AppConfig:
     snapshot_date: str | None = None
     postgres: PostgresConfig = field(default_factory=PostgresConfig)
     market: MarketConfig = field(default_factory=MarketConfig)
     calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
     heston_bounds: HestonBounds = field(default_factory=HestonBounds)
+    svi_bounds: SVIBounds = field(default_factory=SVIBounds)
     figures_dir: Path = PROJECT_ROOT / "outputs" / "figures"
     reports_dir: Path = PROJECT_ROOT / "outputs" / "reports"
 
@@ -88,15 +98,22 @@ def load_config(path: Path | None = None) -> AppConfig:
     market_raw = raw.get("market", {})
     calib_raw = raw.get("calibration", {})
     heston_raw = raw.get("heston", {})
+    svi_raw = raw.get("svi", {})
     outputs_raw = raw.get("outputs", {})
 
-    hb = heston_raw.get("v0", [0.001, 4.0])
     bounds = HestonBounds(
         v0=tuple(heston_raw.get("v0", [0.001, 4.0])),
         kappa=tuple(heston_raw.get("kappa", [0.05, 15.0])),
         theta=tuple(heston_raw.get("theta", [0.001, 4.0])),
         sigma=tuple(heston_raw.get("sigma", [0.05, 3.0])),
         rho=tuple(heston_raw.get("rho", [-0.99, 0.99])),
+    )
+    svi_bounds = SVIBounds(
+        a=tuple(svi_raw.get("a", [0.0, 5.0])),
+        b=tuple(svi_raw.get("b", [0.0, 5.0])),
+        rho=tuple(svi_raw.get("rho", [-0.999, 0.999])),
+        m=tuple(svi_raw.get("m", [-1.5, 1.5])),
+        sigma=tuple(svi_raw.get("sigma", [0.01, 2.0])),
     )
 
     market = MarketConfig(
@@ -124,6 +141,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         market=market,
         calibration=calibration,
         heston_bounds=bounds,
+        svi_bounds=svi_bounds,
         figures_dir=PROJECT_ROOT / outputs_raw.get("figures_dir", "outputs/figures"),
         reports_dir=PROJECT_ROOT / outputs_raw.get("reports_dir", "outputs/reports"),
     )

@@ -11,7 +11,7 @@ from scipy.optimize import minimize
 from btc_vol_research.config import AppConfig, CalibrationConfig, HestonBounds
 from btc_vol_research.models.heston.params import HestonParams
 from btc_vol_research.models.heston.pricer import heston_iv_grid
-from btc_vol_research.models.heston.weights import calibration_weights
+from btc_vol_research.models.calibration_weights import calibration_weights
 
 
 @dataclass

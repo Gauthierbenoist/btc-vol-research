@@ -18,6 +18,14 @@ calibration:
   optimizer: L-BFGS-B
   feller_penalty: 1000.0
 
+# Baseline smile — paramétrisation SVI brute (Gatheral)
+svi:
+  a: [0.0, 5.0]
+  b: [0.0, 5.0]
+  rho: [-0.999, 0.999]
+  m: [-1.5, 1.5]
+  sigma: [0.01, 2.0]
+
 heston:
   v0: [0.001, 4.0]
   kappa: [0.05, 15.0]

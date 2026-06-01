@@ -2,77 +2,77 @@
 
 Recherche quantitative sur la **volatilité implicite** des options BTC (Deribit), à partir de la base **Neon** alimentée par le repo [Projet_Option_BTC](https://github.com/Gauthierbenoist/Projet_Option_BTC).
 
-## Objectifs
+## Pipeline recommandé
 
-- Extraction / contrôle des **volatilités implicites** (inversion BS sur mid + comparaison `mark_iv`)
-- Construction et analyse des **smiles** et **surfaces** IV
-- Effets de **moneyness** et **maturité**
-- Modèle **Heston** : prix analytiques **QuantLib**, **calibration pondérée** (vega × liquidité × surpoids ATM)
-- Comparaison marché vs modèle (RMSE IV)
+1. **Smiles marché** — `run_smile_analysis.py`
+2. **Baseline SVI** — `run_svi_calibration.py` (paramétrisation Gatheral, rapide)
+3. **Heston** — `run_heston_calibration.py` (modèle stochastique, plus lourd)
+4. **Comparaison** — `run_compare_models.py` (RMSE SVI vs Heston)
 
 ## Prérequis
 
-- Python 3.11+
-- Table `btc_options` sur Neon (pipeline ETL phase 1)
-- Fichier `.env` avec `DATABASE_URL` (copier depuis `.env.example`)
-
 ```bash
 python -m venv .venv
-.venv\Scripts\activate   # Windows
+.venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env     # puis éditer DATABASE_URL
+cp .env.example .env     # DATABASE_URL Neon
 ```
 
 ## Utilisation
 
 ```bash
-# Dates disponibles
 python scripts/run_smile_analysis.py --list-dates
-
-# Smiles + surface + rapport
-python scripts/run_smile_analysis.py
 python scripts/run_smile_analysis.py --date 2026-06-01
 
-# Calibration Heston (6 maturités les plus denses par défaut)
-python scripts/run_heston_calibration.py
+# Baseline (à lancer en premier)
+python scripts/run_svi_calibration.py --date 2026-06-01
+
+# Modèle stochastique
 python scripts/run_heston_calibration.py --date 2026-06-01 --max-slices 4
+
+# Tableau comparatif
+python scripts/run_compare_models.py --date 2026-06-01 --max-slices 4
 ```
 
-**Sorties** : `outputs/figures/` (PNG), `outputs/reports/` (CSV).
+**Sorties** : `outputs/figures/` (`svi_fit_*.png`, `heston_fit_*.png`), `outputs/reports/` (`svi_calibration_*.csv`, …).
+
+## SVI (baseline)
+
+Variance totale :  
+`w(k) = a + b ( ρ(k−m) + √((k−m)² + σ²) )`  
+avec `k = ln(K/F)`, `σ_IV = √(w/T)`.
+
+- Calibration par maturité, même **pondération** que Heston (vega × √OI × ATM)
+- Contrainte **no butterfly** (condition suffisante Gatheral)
+- Courbe lisse tracée sur une grille fine de `k`
 
 ## Structure
 
 ```
 src/btc_vol_research/
-  data/          # Neon → panel marché
-  iv/            # Black-Scholes, conventions OTM
-  surfaces/      # smiles, surface 3D, plots
-  models/heston/ # pricer, calibration pondérée
-  analysis/      # métriques et rapports
-scripts/         # CLI
-configs/         # paramètres par défaut
+  models/svi/       # baseline smile
+  models/heston/    # QuantLib + calibration
+  models/calibration_weights.py
+  surfaces/         # plots
+scripts/
+  run_svi_calibration.py
+  run_heston_calibration.py
+  run_compare_models.py
 ```
 
-## Calibration (défauts)
+## Calibration (défauts communs)
 
 | Élément | Choix |
 |---------|--------|
 | Smile | Options **OTM** |
-| IV marché | `iv_mid` (inversion BS), sinon `mark_iv` |
-| Poids | `vega × √OI × exp(-½(ln(K/F)/σ_ATM)²)` |
-| Objectif | `Σ w_i (σ_heston - σ_mkt)²` |
-| `r`, `q` | 0 (BTC) |
+| IV | `mark_iv` si mid incohérent, sinon inversion BS |
+| Poids | `vega × √OI × gaussienne ATM` |
+| Objectif | `Σ w_i (σ_model − σ_mkt)²` |
 
-Ajustable dans `configs/default.yaml` et `.env`.
+Paramètres : `configs/default.yaml` (`svi:` et `heston:`).
 
 ## Tests
 
 ```bash
-pip install pytest
 pytest tests/ -q
 ```
-
-## Lien phase 1
-
-Ce repo **lit uniquement** Neon ; il ne télécharge pas Deribit.  
-Pipeline données : `Projet_Option_BTC`.

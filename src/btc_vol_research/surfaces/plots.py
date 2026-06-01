@@ -74,23 +74,29 @@ def plot_calibration_fit(
     out_dir: Path,
     snapshot_date: str,
     slice_id: str,
+    *,
+    model_name: str = "Heston",
+    file_prefix: str | None = None,
+    smooth_curve: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
+    prefix = file_prefix or model_name.lower()
+    order = np.argsort(slice_df["log_moneyness"].values)
+    lm = slice_df["log_moneyness"].values[order]
+    miv = np.asarray(model_iv)[order]
     fig, ax = plt.subplots(figsize=(8, 5))
     ax.scatter(slice_df["log_moneyness"], slice_df["iv_used"] * 100, label="Marché", s=20)
-    ax.plot(
-        slice_df["log_moneyness"],
-        model_iv * 100,
-        "r-",
-        lw=2,
-        label="Heston calibré",
-    )
+    if smooth_curve is not None:
+        k_fine, iv_fine = smooth_curve
+        ax.plot(k_fine, iv_fine * 100, "r-", lw=2, label=f"{model_name} calibré")
+    else:
+        ax.plot(lm, miv * 100, "r-", lw=2, label=f"{model_name} calibré")
     ax.set_xlabel("log(K/F)")
     ax.set_ylabel("IV (%)")
-    ax.set_title(f"Calibration Heston — {snapshot_date} — {slice_id}")
+    ax.set_title(f"Calibration {model_name} — {snapshot_date} — {slice_id}")
     ax.legend()
     ax.grid(True, alpha=0.3)
-    path = out_dir / f"heston_fit_{snapshot_date}_{slice_id}.png"
+    path = out_dir / f"{prefix}_fit_{snapshot_date}_{slice_id}.png"
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)
