@@ -8,8 +8,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
+from typing import TYPE_CHECKING
+
 from btc_vol_research.surfaces.smile import iter_slices
 from btc_vol_research.surfaces.surface import build_iv_surface_grid
+
+if TYPE_CHECKING:
+    from btc_vol_research.models.svi.calibrate import SVICalibrationResult
 
 
 def plot_smiles(
@@ -66,6 +71,67 @@ def plot_iv_surface(
     fig.savefig(path, dpi=120)
     plt.close(fig)
     return path
+
+
+def plot_svi_surface(
+    results: "list[SVICalibrationResult]",
+    panel: pd.DataFrame,
+    out_dir: Path,
+    snapshot_date: str,
+    *,
+    n_moneyness: int = 50,
+    n_maturities: int = 30,
+) -> tuple[Path, Path]:
+    """
+    Surface 3D + carte de chaleur (contour) de la vol SVI calibrée.
+
+    Returns:
+        (path_3d, path_contour)
+    """
+    from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lm_grid, T_grid, iv_matrix = build_svi_surface_grid(
+        results,
+        panel,
+        n_moneyness=n_moneyness,
+        n_maturities=n_maturities,
+    )
+
+    # 3D
+    fig = plt.figure(figsize=(10, 6))
+    ax = fig.add_subplot(111, projection="3d")
+    surf = ax.plot_surface(
+        lm_grid,
+        T_grid,
+        iv_matrix * 100,
+        cmap="plasma",
+        edgecolor="none",
+        alpha=0.92,
+    )
+    fig.colorbar(surf, ax=ax, shrink=0.55, label="IV (%)")
+    ax.set_xlabel("log(K/F)")
+    ax.set_ylabel("T (années)")
+    ax.set_zlabel("IV (%)")
+    ax.set_title(f"Surface SVI — {snapshot_date}")
+    path_3d = out_dir / f"svi_surface_3d_{snapshot_date}.png"
+    fig.tight_layout()
+    fig.savefig(path_3d, dpi=120)
+    plt.close(fig)
+
+    # Contour (souvent plus lisible)
+    fig2, ax2 = plt.subplots(figsize=(9, 5))
+    cf = ax2.contourf(lm_grid, T_grid, iv_matrix * 100, levels=25, cmap="plasma")
+    fig2.colorbar(cf, ax=ax2, label="IV (%)")
+    ax2.set_xlabel("log(K/F)")
+    ax2.set_ylabel("T (années)")
+    ax2.set_title(f"Surface SVI (vue contour) — {snapshot_date}")
+    path_contour = out_dir / f"svi_surface_contour_{snapshot_date}.png"
+    fig2.tight_layout()
+    fig2.savefig(path_contour, dpi=120)
+    plt.close(fig2)
+
+    return path_3d, path_contour
 
 
 def plot_calibration_fit(

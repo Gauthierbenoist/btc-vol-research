@@ -45,6 +45,7 @@ avec `k = ln(K/F)`, `σ_IV = √(w/T)`.
 - Calibration par maturité, même **pondération** que Heston (vega × √OI × ATM)
 - Contrainte **no butterfly** (condition suffisante Gatheral)
 - Courbe lisse tracée sur une grille fine de `k`
+- **Surface 3D + contour** : interpolation de `w(k)` entre tenors (`svi_surface_3d_*.png`, `svi_surface_contour_*.png`, CSV grille)
 
 ## Structure
 

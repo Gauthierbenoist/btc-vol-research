@@ -37,6 +37,11 @@ heston:
     sigma: 0.4
     rho: -0.5
 
+svi_surface:
+  n_moneyness: 50
+  n_maturities: 30
+  k_pad: 0.05
+
 outputs:
   figures_dir: outputs/figures
   reports_dir: outputs/reports
