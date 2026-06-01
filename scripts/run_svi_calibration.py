@@ -20,10 +20,14 @@ from btc_vol_research.data.loader import load_snapshot  # noqa: E402
 from btc_vol_research.data.panel import build_market_panel  # noqa: E402
 from btc_vol_research.models.svi.calibrate import calibrate_all_slices  # noqa: E402
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness  # noqa: E402
-from btc_vol_research.surfaces.plots import plot_calibration_fit, plot_svi_surface  # noqa: E402
+from btc_vol_research.surfaces.plots import (  # noqa: E402
+    plot_calibration_fit,
+    plot_svi_rho_term_structure,
+    plot_svi_surface,
+)
+from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table  # noqa: E402
 from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid, surface_to_long_dataframe  # noqa: E402
 from btc_vol_research.analysis.report import write_svi_calibration_report  # noqa: E402
-from btc_vol_research.analysis.svi_metrics import svi_summary_table  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -61,6 +65,13 @@ def main() -> int:
     print(f"Snapshot {snapshot_date} — baseline SVI ({len(results)} tranches)\n")
     print(table.to_string(index=False))
     print(f"\nRapport: {report_path}")
+
+    ts = svi_term_structure_table(results)
+    rho_csv = cfg.reports_dir / f"svi_rho_term_{snap_str}.csv"
+    rho_csv.parent.mkdir(parents=True, exist_ok=True)
+    ts.to_csv(rho_csv, index=False)
+    rho_path = plot_svi_rho_term_structure(results, cfg.figures_dir, snap_str)
+    print(f"rho(T) : {rho_path.name} | CSV : {rho_csv.name}")
 
     for r in results:
         g = panel_sub.loc[panel_sub["slice_id"] == r.slice_id].sort_values("log_moneyness")

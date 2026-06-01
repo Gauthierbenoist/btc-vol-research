@@ -26,3 +26,23 @@ def svi_summary_table(results: list[SVICalibrationResult]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows).sort_values("slice_id")
+
+
+def svi_term_structure_table(results: list[SVICalibrationResult]) -> pd.DataFrame:
+    """Paramètres SVI en fonction de la maturité (pour ρ(T), etc.)."""
+    rows = []
+    for r in results:
+        p = r.params
+        rows.append(
+            {
+                "slice_id": r.slice_id,
+                "T_years": r.T,
+                "T_days": r.T * 365.25,
+                "rho": p.rho,
+                "a": p.a,
+                "b": p.b,
+                "m": p.m,
+                "sigma": p.sigma,
+            }
+        )
+    return pd.DataFrame(rows).sort_values("T_years")

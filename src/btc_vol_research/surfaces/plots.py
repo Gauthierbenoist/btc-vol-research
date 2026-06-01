@@ -134,6 +134,46 @@ def plot_svi_surface(
     return path_3d, path_contour
 
 
+def plot_svi_rho_term_structure(
+    results: "list[SVICalibrationResult]",
+    out_dir: Path,
+    snapshot_date: str,
+) -> Path:
+    """
+    Trace ρ(T) — paramètre de corrélation/skew SVI par maturité calibrée.
+    """
+    from btc_vol_research.analysis.svi_metrics import svi_term_structure_table
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    ts = svi_term_structure_table(results)
+    T = ts["T_years"].values
+    rho = ts["rho"].values
+
+    fig, ax = plt.subplots(figsize=(8, 5))
+    ax.plot(T, rho, "o-", color="steelblue", lw=2, markersize=8, label=r"$\rho(T)$ SVI")
+    ax.axhline(0, color="gray", ls="--", lw=0.8)
+    for _, row in ts.iterrows():
+        ax.annotate(
+            row["slice_id"],
+            (row["T_years"], row["rho"]),
+            textcoords="offset points",
+            xytext=(0, 6),
+            ha="center",
+            fontsize=7,
+            alpha=0.85,
+        )
+    ax.set_xlabel("Maturité T (années)")
+    ax.set_ylabel(r"$\rho$ (paramètre SVI)")
+    ax.set_title(f"Structure terme du skew SVI — ρ(T) — {snapshot_date}")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+    path = out_dir / f"svi_rho_term_{snapshot_date}.png"
+    fig.tight_layout()
+    fig.savefig(path, dpi=120)
+    plt.close(fig)
+    return path
+
+
 def plot_calibration_fit(
     slice_df: pd.DataFrame,
     model_iv: np.ndarray,
