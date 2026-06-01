@@ -26,6 +26,7 @@ python scripts/run_smile_analysis.py --date 2026-06-01
 
 # Baseline (à lancer en premier)
 python scripts/run_svi_calibration.py --date 2026-06-01
+# rho(T) + surface : toutes les maturités éligibles ; --max-slices limite seulement les PNG smile
 
 # Modèle stochastique
 python scripts/run_heston_calibration.py --date 2026-06-01 --max-slices 4
