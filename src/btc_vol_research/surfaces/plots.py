@@ -22,14 +22,16 @@ def plot_smiles(
     out_dir: Path,
     snapshot_date: str,
     *,
-    iv_col: str = "iv_used",
+    iv_col: str = "iv_mid",
+    iv_label: str = "iv_mid (inversion BS)",
     compare_mark: bool = True,
 ) -> list[Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     paths: list[Path] = []
     for sid, g in iter_slices(panel):
         fig, ax = plt.subplots(figsize=(8, 5))
-        ax.scatter(g["log_moneyness"], g[iv_col] * 100, s=12, alpha=0.7, label="IV utilisée")
+        if iv_col in g.columns:
+            ax.scatter(g["log_moneyness"], g[iv_col] * 100, s=12, alpha=0.7, label=iv_label)
         if compare_mark and "iv_mark" in g.columns:
             ax.scatter(
                 g["log_moneyness"],
