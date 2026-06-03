@@ -31,7 +31,44 @@ def plot_smiles(
     for sid, g in iter_slices(panel):
         fig, ax = plt.subplots(figsize=(8, 5))
         if iv_col in g.columns:
-            ax.scatter(g["log_moneyness"], g[iv_col] * 100, s=12, alpha=0.7, label=iv_label)
+            lm = g["log_moneyness"]
+            iv_pct = g[iv_col] * 100
+            bid_nan = g["bid_price"].isna() if "bid_price" in g.columns else pd.Series(False, index=g.index)
+            ask_nan = g["ask_price"].isna() if "ask_price" in g.columns else pd.Series(False, index=g.index)
+            both_nan = bid_nan & ask_nan
+            only_bid_nan = bid_nan & ~ask_nan
+            only_ask_nan = ask_nan & ~bid_nan
+            ok = ~bid_nan & ~ask_nan
+
+            if ok.any():
+                ax.scatter(lm[ok], iv_pct[ok], s=12, alpha=0.7, c="C0", label=iv_label)
+            if only_bid_nan.any():
+                ax.scatter(
+                    lm[only_bid_nan],
+                    iv_pct[only_bid_nan],
+                    s=14,
+                    alpha=0.85,
+                    c="red",
+                    label="bid NaN",
+                )
+            if only_ask_nan.any():
+                ax.scatter(
+                    lm[only_ask_nan],
+                    iv_pct[only_ask_nan],
+                    s=14,
+                    alpha=0.85,
+                    c="green",
+                    label="ask NaN",
+                )
+            if both_nan.any():
+                ax.scatter(
+                    lm[both_nan],
+                    iv_pct[both_nan],
+                    s=14,
+                    alpha=0.85,
+                    c="darkorange",
+                    label="bid & ask NaN",
+                )
         if compare_mark and "iv_mark" in g.columns:
             ax.scatter(
                 g["log_moneyness"],
@@ -39,6 +76,7 @@ def plot_smiles(
                 s=10,
                 alpha=0.4,
                 marker="x",
+                c="gray",
                 label="mark_iv Deribit",
             )
         ax.set_xlabel("log(K/F)")
