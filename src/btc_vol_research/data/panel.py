@@ -13,11 +13,12 @@ from btc_vol_research.iv.conventions import apply_smile_convention, relative_spr
 def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = None) -> pd.DataFrame:
     """
     Enrichit le snapshot : forward, log-moneyness, IV mid (inversion BS), filtres qualité.
+
+    Deribit : primes bid/ask/mid/mark en BTC, underlying et strike en USD → conversion USD pour BS.
     """
     market = cfg.market if isinstance(cfg, AppConfig) else (cfg or MarketConfig())
 
     out = df.copy()
-    out["option_price"] = out["mid_price"].where(out["mid_price"].notna(), out["mark_price"])
     out["T"] = out["time_to_expiry_years"].astype(float)
     out["S"] = out["underlying_price"].astype(float)
     out["K"] = out["strike"].astype(float)
@@ -27,10 +28,14 @@ def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = 
     )
     out["log_moneyness"] = np.log(out["K"] / out["forward"])
 
-    out["rel_spread"] = relative_spread(out["bid_price"], out["ask_price"], out["option_price"])
+    price_btc = out["mid_price"].where(out["mid_price"].notna(), out["mark_price"])
+    out["option_price_btc"] = price_btc
+    out["option_price_usd"] = price_btc * out["S"]
+
+    out["rel_spread"] = relative_spread(out["bid_price"], out["ask_price"], price_btc)
     out["iv_mark"] = out["mark_iv"].astype(float)
     out["iv_mid"] = implied_volatility(
-        out["option_price"],
+        out["option_price_usd"],
         out["S"],
         out["K"],
         out["T"],
