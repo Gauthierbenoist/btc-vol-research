@@ -11,9 +11,7 @@ market:
   smile_convention: otm  # otm | calls | puts | all
 
 calibration:
-  atm_log_moneyness_sigma: 0.25   # plus large => moins de concentration ATM
-  atm_gaussian_strength: 0.35    # 0 = pas de gaussienne ; 1 = surpoids ATM max
-  atm_zone_half_width: 0.10      # |log(K/F)| <= w => ATM ; au-delà => ailes
+  atm_zone_half_width: 0.10   # diagnostics RMSE par zone uniquement
   use_vega_weight: true
   use_liquidity_weight: true
   min_strikes_per_slice: 5

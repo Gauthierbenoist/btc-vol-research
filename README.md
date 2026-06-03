@@ -69,7 +69,7 @@ scripts/
 |---------|--------|
 | Smile | Options **OTM** |
 | IV | `mark_iv` si mid incohérent, sinon inversion BS |
-| Poids | `vega × √OI × [(1−s) + s·exp(−½(k/σ)²)]` avec σ=0,25, s=0,35 |
+| Poids | `vega × √OI` |
 | Objectif | `Σ w_i (σ_model − σ_mkt)²` |
 
 Paramètres : `configs/default.yaml` (`svi:` et `heston:`).

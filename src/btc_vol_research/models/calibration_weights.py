@@ -15,7 +15,7 @@ def calibration_weights(
     r: float,
     q: float,
 ) -> np.ndarray:
-    """w_i ∝ vega × √OI × gaussienne ATM, normalisées."""
+    """w_i ∝ vega × √OI (normalisées)."""
     n = len(slice_df)
     w = np.ones(n)
     S0 = float(slice_df["S"].iloc[0])
@@ -34,9 +34,4 @@ def calibration_weights(
         oi = slice_df["open_interest"].astype(float).values
         w *= np.sqrt(np.maximum(oi, 1e-8))
 
-    lm = slice_df["log_moneyness"].values
-    atm_w = np.exp(-0.5 * (lm / cfg.atm_log_moneyness_sigma) ** 2)
-    # strength=0 : pas de surpoids ATM ; strength=1 : gaussienne pleine
-    s = cfg.atm_gaussian_strength
-    w *= (1.0 - s) + s * atm_w
     return w / (w.sum() + 1e-12) * n
