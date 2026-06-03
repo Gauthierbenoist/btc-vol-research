@@ -40,7 +40,8 @@ class MarketConfig:
 
 @dataclass(frozen=True)
 class CalibrationConfig:
-    atm_log_moneyness_sigma: float = float(os.getenv("CALIB_ATM_SIGMA", "0.15"))
+    atm_log_moneyness_sigma: float = float(os.getenv("CALIB_ATM_SIGMA", "0.25"))
+    atm_gaussian_strength: float = float(os.getenv("CALIB_ATM_GAUSS_STRENGTH", "0.35"))
     atm_zone_half_width: float = float(os.getenv("CALIB_ATM_ZONE_WIDTH", "0.10"))
     use_vega_weight: bool = _env_bool("CALIB_USE_VEGA_WEIGHT", True)
     use_liquidity_weight: bool = _env_bool("CALIB_USE_LIQUIDITY_WEIGHT", True)
@@ -128,7 +129,8 @@ def load_config(path: Path | None = None) -> AppConfig:
     )
 
     calibration = CalibrationConfig(
-        atm_log_moneyness_sigma=float(calib_raw.get("atm_log_moneyness_sigma", 0.15)),
+        atm_log_moneyness_sigma=float(calib_raw.get("atm_log_moneyness_sigma", 0.25)),
+        atm_gaussian_strength=float(calib_raw.get("atm_gaussian_strength", 0.35)),
         atm_zone_half_width=float(calib_raw.get("atm_zone_half_width", 0.10)),
         use_vega_weight=bool(calib_raw.get("use_vega_weight", True)),
         use_liquidity_weight=bool(calib_raw.get("use_liquidity_weight", True)),

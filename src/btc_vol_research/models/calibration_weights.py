@@ -35,5 +35,8 @@ def calibration_weights(
         w *= np.sqrt(np.maximum(oi, 1e-8))
 
     lm = slice_df["log_moneyness"].values
-    w *= np.exp(-0.5 * (lm / cfg.atm_log_moneyness_sigma) ** 2)
+    atm_w = np.exp(-0.5 * (lm / cfg.atm_log_moneyness_sigma) ** 2)
+    # strength=0 : pas de surpoids ATM ; strength=1 : gaussienne pleine
+    s = cfg.atm_gaussian_strength
+    w *= (1.0 - s) + s * atm_w
     return w / (w.sum() + 1e-12) * n
