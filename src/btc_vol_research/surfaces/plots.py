@@ -224,6 +224,42 @@ def plot_calibration_fit(
     return path
 
 
+def plot_merton_surface_plotly(
+    lm_grid: np.ndarray,
+    t_grid: np.ndarray,
+    iv_matrix: np.ndarray,
+    out_dir: Path,
+    snapshot_date: str,
+) -> Path:
+    """Surface 3D Merton en Plotly (HTML interactif)."""
+    import plotly.graph_objects as go
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig = go.Figure(
+        data=[
+            go.Surface(
+                x=lm_grid,
+                y=t_grid,
+                z=iv_matrix * 100.0,
+                colorscale="Plasma",
+                colorbar={"title": "IV (%)"},
+            )
+        ]
+    )
+    fig.update_layout(
+        title=f"Surface Merton — {snapshot_date}",
+        scene={
+            "xaxis_title": "log(K/F)",
+            "yaxis_title": "T (années)",
+            "zaxis_title": "IV (%)",
+        },
+        margin={"l": 0, "r": 0, "b": 0, "t": 50},
+    )
+    path = out_dir / f"merton_surface_3d_{snapshot_date}.html"
+    fig.write_html(path, include_plotlyjs="cdn")
+    return path
+
+
 def plot_mark_vs_mid(
     panel: pd.DataFrame,
     out_dir: Path,

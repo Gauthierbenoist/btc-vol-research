@@ -60,8 +60,10 @@ def merton_option_price(
         if pois_prob < 1e-14 and n > 0:
             break
         sigma_n = np.sqrt(params.sigma**2 + n * params.sigma_jump**2 / T)
-        r_n = r - q - params.lambda_jump * k + n * jump_drift / T
-        price += pois_prob * pricer(S0, K, T, r_n, 0.0, sigma_n)
+        # Merton series: keep r and q unchanged inside Black-Scholes, and
+        # absorb jump compensation / conditional jump drift into an adjusted spot.
+        s_n = S0 * np.exp(-params.lambda_jump * k * T + n * jump_drift)
+        price += pois_prob * pricer(s_n, K, T, r, q, sigma_n)
 
     return float(price)
 

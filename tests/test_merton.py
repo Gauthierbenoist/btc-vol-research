@@ -13,7 +13,7 @@ sys.path.insert(0, str(SRC))
 from btc_vol_research.config import AppConfig, MertonBounds  # noqa: E402
 from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
 from btc_vol_research.models.merton.params import MertonParams  # noqa: E402
-from btc_vol_research.models.merton.pricer import merton_option_price  # noqa: E402
+from btc_vol_research.models.merton.pricer import merton_iv_row, merton_option_price  # noqa: E402
 
 
 def test_merton_call_positive():
@@ -26,6 +26,23 @@ def test_merton_params_valid():
     p = MertonParams(sigma=0.4, lambda_jump=1.0, mu_jump=-0.05, sigma_jump=0.15)
     assert p.is_valid()
     assert p.jump_compensation() > -1
+
+
+def test_merton_put_call_parity_and_iv_consistency():
+    p = MertonParams(sigma=0.36, lambda_jump=0.15, mu_jump=-0.4, sigma_jump=0.37)
+    S = 100_000.0
+    K = 100_000.0
+    T = 0.55
+    r = 0.0
+    q = 0.0
+    call = merton_option_price(S, K, T, p, r, q, option_type="call")
+    put = merton_option_price(S, K, T, p, r, q, option_type="put")
+    parity_gap = call - put - (S * np.exp(-q * T) - K * np.exp(-r * T))
+    assert abs(parity_gap) < 1e-6
+
+    iv_call = merton_iv_row(S, K, T, p, r, q, "call")
+    iv_put = merton_iv_row(S, K, T, p, r, q, "put")
+    assert abs(iv_call - iv_put) < 1e-6
 
 
 def test_merton_global_calibration_toy_panel():

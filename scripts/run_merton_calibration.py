@@ -23,7 +23,11 @@ from btc_vol_research.analysis.calibration_tables import (  # noqa: E402
     slice_fit_summary_table,
 )
 from btc_vol_research.analysis.report import write_merton_calibration_report  # noqa: E402
-from btc_vol_research.surfaces.plots import plot_calibration_fit  # noqa: E402
+from btc_vol_research.surfaces.merton_surface import (  # noqa: E402
+    build_merton_surface_grid,
+    surface_to_long_dataframe,
+)
+from btc_vol_research.surfaces.plots import plot_calibration_fit, plot_merton_surface_plotly  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -57,8 +61,14 @@ def main() -> int:
     slice_tbl = slice_fit_summary_table(result.slice_results)
     global_path, slice_path = write_merton_calibration_report(result, cfg.reports_dir, snap_str)
 
-    print(f"Snapshot {snapshot_date} — Merton global : {result.n_points} points, "
-          f"{len(result.slice_results)} maturites")
+    print(
+        f"Snapshot {snapshot_date} — Merton global : {result.n_points} points, "
+        f"{len(result.slice_results)} maturites"
+    )
+    print(
+        f"Calibration globale sur {len(result.slice_results)} maturites ; "
+        f"{args.max_slices if args.max_slices > 0 else len(result.slice_results)} smiles traces."
+    )
     print("\n=== Parametres globaux ===")
     print(global_tbl.to_string(index=False))
     print(f"\nRapports: {global_path.name}, {slice_path.name}")
@@ -83,7 +93,19 @@ def main() -> int:
         )
         print(f"  {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
 
+    lm_grid, t_grid, iv_grid = build_merton_surface_grid(
+        fit_df,
+        result.params,
+        cfg.market.risk_free_rate,
+        cfg.market.dividend_yield,
+    )
+    surface_html = plot_merton_surface_plotly(lm_grid, t_grid, iv_grid, cfg.figures_dir, snap_str)
+    surface_csv = cfg.reports_dir / f"merton_surface_{snap_str}.csv"
+    surface_to_long_dataframe(lm_grid, t_grid, iv_grid, snap_str).to_csv(surface_csv, index=False)
+
     print(f"\nFigures: merton_fit_{snap_str}_*.png ({len(plot_slices)} tranches)")
+    print(f"Surface 3D Plotly: {surface_html.name}")
+    print(f"CSV surface: {surface_csv.name}")
     return 0
 
 
