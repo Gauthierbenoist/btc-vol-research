@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from btc_vol_research.config import AppConfig, CalibrationConfig, HestonBounds
+from btc_vol_research.config import AppConfig, HestonBounds
+from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse, iv_weighted_rmse
+from btc_vol_research.models.calibration.filters import quality_filter
 from btc_vol_research.models.heston.params import HestonParams
 from btc_vol_research.models.heston.pricer import heston_iv_grid
-from btc_vol_research.models.calibration_weights import calibration_weights
+from btc_vol_research.models.calibration_weights import WeightFn, calibration_weights
 
 
 @dataclass
@@ -43,6 +46,8 @@ def calibrate_slice(
     slice_df: pd.DataFrame,
     cfg: AppConfig,
     slice_id: str | None = None,
+    *,
+    weight_fn: WeightFn | None = None,
 ) -> CalibrationResult:
     """Minimise Σ w_i (σ_model - σ_mkt)² sur une maturité."""
     calib = cfg.calibration
@@ -53,17 +58,14 @@ def calibrate_slice(
     if len(slice_df) < calib.min_strikes_per_slice:
         raise ValueError(f"Slice {sid}: seulement {len(slice_df)} strikes (min {calib.min_strikes_per_slice})")
 
-    slice_df = slice_df.loc[
-        slice_df["iv_used"].between(0.05, 3.0) & slice_df["T"].between(1 / 365, 2.0)
-    ].copy()
-    if len(slice_df) < calib.min_strikes_per_slice:
-        raise ValueError(f"Slice {sid}: pas assez de quotes IV après filtre qualité")
+    slice_df = quality_filter(slice_df, min_strikes=calib.min_strikes_per_slice)
 
     S0 = float(slice_df["S"].iloc[0])
     T = float(slice_df["T"].iloc[0])
     strikes = slice_df["K"].values.astype(float)
     market_iv = slice_df["iv_used"].values.astype(float)
-    weights = calibration_weights(slice_df, calib, market.risk_free_rate, market.dividend_yield)
+    w_fn = weight_fn or calibration_weights
+    weights = w_fn(slice_df, calib, market.risk_free_rate, market.dividend_yield)
 
     x0 = _initial_guess(slice_df, bounds).as_array()
     bnds = [bounds.v0, bounds.kappa, bounds.theta, bounds.sigma, bounds.rho]
@@ -87,7 +89,7 @@ def calibrate_slice(
         if np.any(~np.isfinite(model_iv)):
             return calib.feller_penalty
         err = (model_iv - market_iv) ** 2
-        return float(np.sum(weights * err))
+        return iv_sse(market_iv, model_iv, weights)
 
     res = minimize(objective, x0, method=calib.optimizer, bounds=bnds, options={"maxiter": 200})
 
@@ -102,8 +104,8 @@ def calibrate_slice(
         slice_df["option_type"].values,
     )
     err = model_iv - market_iv
-    rmse = float(np.sqrt(np.mean(err**2)))
-    w_rmse = float(np.sqrt(np.mean(weights * err**2 / (weights.sum() + 1e-12))))
+    rmse = iv_rmse(market_iv, model_iv)
+    w_rmse = iv_weighted_rmse(market_iv, model_iv, weights)
 
     return CalibrationResult(
         slice_id=sid,
@@ -118,13 +120,18 @@ def calibrate_slice(
     )
 
 
-def calibrate_all_slices(panel: pd.DataFrame, cfg: AppConfig) -> list[CalibrationResult]:
+def calibrate_all_slices(
+    panel: pd.DataFrame,
+    cfg: AppConfig,
+    *,
+    weight_fn: WeightFn | None = None,
+) -> list[CalibrationResult]:
     results: list[CalibrationResult] = []
     for sid, g in panel.groupby("slice_id"):
         if len(g) < cfg.calibration.min_strikes_per_slice:
             continue
         try:
-            results.append(calibrate_slice(g, cfg, str(sid)))
+            results.append(calibrate_slice(g, cfg, str(sid), weight_fn=weight_fn))
         except Exception:
             continue
     return results

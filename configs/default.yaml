@@ -37,6 +37,12 @@ heston:
     sigma: 0.4
     rho: -0.5
 
+merton:
+  sigma: [0.05, 2.0]
+  lambda_jump: [0.0, 10.0]
+  mu_jump: [-1.0, 1.0]
+  sigma_jump: [0.01, 1.0]
+
 svi_surface:
   n_moneyness: 50
   n_maturities: 30

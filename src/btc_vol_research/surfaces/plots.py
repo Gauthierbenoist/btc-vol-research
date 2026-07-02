@@ -31,43 +31,14 @@ def plot_smiles(
     for sid, g in iter_slices(panel):
         fig, ax = plt.subplots(figsize=(8, 5))
         if iv_col in g.columns:
-            lm = g["log_moneyness"]
-            iv_pct = g[iv_col] * 100
-            bid_nan = g["bid_price"].isna() if "bid_price" in g.columns else pd.Series(False, index=g.index)
-            ask_nan = g["ask_price"].isna() if "ask_price" in g.columns else pd.Series(False, index=g.index)
-            both_nan = bid_nan & ask_nan
-            only_bid_nan = bid_nan & ~ask_nan
-            only_ask_nan = ask_nan & ~bid_nan
-            ok = ~bid_nan & ~ask_nan
-
-            if ok.any():
-                ax.scatter(lm[ok], iv_pct[ok], s=12, alpha=0.7, c="C0", label=iv_label)
-            if only_bid_nan.any():
+            valid = g[iv_col].notna()
+            if valid.any():
                 ax.scatter(
-                    lm[only_bid_nan],
-                    iv_pct[only_bid_nan],
-                    s=14,
-                    alpha=0.85,
-                    c="red",
-                    label="bid NaN",
-                )
-            if only_ask_nan.any():
-                ax.scatter(
-                    lm[only_ask_nan],
-                    iv_pct[only_ask_nan],
-                    s=14,
-                    alpha=0.85,
-                    c="green",
-                    label="ask NaN",
-                )
-            if both_nan.any():
-                ax.scatter(
-                    lm[both_nan],
-                    iv_pct[both_nan],
-                    s=14,
-                    alpha=0.85,
-                    c="darkorange",
-                    label="bid & ask NaN",
+                    g.loc[valid, "log_moneyness"],
+                    g.loc[valid, iv_col] * 100,
+                    s=12,
+                    alpha=0.7,
+                    label=iv_label,
                 )
         if compare_mark and "iv_mark" in g.columns:
             ax.scatter(
@@ -76,7 +47,6 @@ def plot_smiles(
                 s=10,
                 alpha=0.4,
                 marker="x",
-                c="gray",
                 label="mark_iv Deribit",
             )
         ax.set_xlabel("log(K/F)")
@@ -121,6 +91,8 @@ def plot_svi_surface(
     *,
     n_moneyness: int = 50,
     n_maturities: int = 30,
+    file_stem: str = "svi_surface",
+    title_suffix: str = "",
 ) -> tuple[Path, Path]:
     """
     Surface 3D + carte de chaleur (contour) de la vol SVI calibrée.
@@ -153,8 +125,8 @@ def plot_svi_surface(
     ax.set_xlabel("log(K/F)")
     ax.set_ylabel("T (années)")
     ax.set_zlabel("IV (%)")
-    ax.set_title(f"Surface SVI — {snapshot_date}")
-    path_3d = out_dir / f"svi_surface_3d_{snapshot_date}.png"
+    ax.set_title(f"Surface SVI{title_suffix} — {snapshot_date}")
+    path_3d = out_dir / f"{file_stem}_3d_{snapshot_date}.png"
     fig.tight_layout()
     fig.savefig(path_3d, dpi=120)
     plt.close(fig)
@@ -165,8 +137,8 @@ def plot_svi_surface(
     fig2.colorbar(cf, ax=ax2, label="IV (%)")
     ax2.set_xlabel("log(K/F)")
     ax2.set_ylabel("T (années)")
-    ax2.set_title(f"Surface SVI (vue contour) — {snapshot_date}")
-    path_contour = out_dir / f"svi_surface_contour_{snapshot_date}.png"
+    ax2.set_title(f"Surface SVI{title_suffix} (vue contour) — {snapshot_date}")
+    path_contour = out_dir / f"{file_stem}_contour_{snapshot_date}.png"
     fig2.tight_layout()
     fig2.savefig(path_contour, dpi=120)
     plt.close(fig2)
@@ -178,6 +150,9 @@ def plot_svi_rho_term_structure(
     results: "list[SVICalibrationResult]",
     out_dir: Path,
     snapshot_date: str,
+    *,
+    file_stem: str = "svi_rho_term",
+    title_suffix: str = "",
 ) -> Path:
     """
     Trace ρ(T) — paramètre de corrélation/skew SVI par maturité calibrée.
@@ -204,10 +179,10 @@ def plot_svi_rho_term_structure(
         )
     ax.set_xlabel("Maturité T (années)")
     ax.set_ylabel(r"$\rho$ (paramètre SVI)")
-    ax.set_title(f"Structure terme du skew SVI — ρ(T) — {snapshot_date}")
+    ax.set_title(f"Structure terme du skew SVI{title_suffix} — rho(T) — {snapshot_date}")
     ax.grid(True, alpha=0.3)
     ax.legend()
-    path = out_dir / f"svi_rho_term_{snapshot_date}.png"
+    path = out_dir / f"{file_stem}_{snapshot_date}.png"
     fig.tight_layout()
     fig.savefig(path, dpi=120)
     plt.close(fig)

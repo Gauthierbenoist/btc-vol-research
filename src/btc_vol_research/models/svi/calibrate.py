@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -9,7 +10,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from btc_vol_research.config import AppConfig, SVIBounds
-from btc_vol_research.models.calibration_weights import calibration_weights
+from btc_vol_research.models.calibration_weights import WeightFn, calibration_weights
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness, svi_total_variance
 from btc_vol_research.models.svi.params import SVIParams
 
@@ -57,6 +58,8 @@ def calibrate_slice(
     slice_df: pd.DataFrame,
     cfg: AppConfig,
     slice_id: str | None = None,
+    *,
+    weight_fn: WeightFn | None = None,
 ) -> SVICalibrationResult:
     """Minimise Σ w_i (σ_SVI(k_i) - σ_mkt,i)²."""
     calib = cfg.calibration
@@ -68,7 +71,8 @@ def calibrate_slice(
     T = float(slice_df["T"].iloc[0])
     k = slice_df["log_moneyness"].values.astype(float)
     market_iv = slice_df["iv_used"].values.astype(float)
-    weights = calibration_weights(slice_df, calib, market.risk_free_rate, market.dividend_yield)
+    w_fn = weight_fn or calibration_weights
+    weights = w_fn(slice_df, calib, market.risk_free_rate, market.dividend_yield)
 
     x0 = _initial_guess(slice_df, T, bounds).as_array()
     bnds = [bounds.a, bounds.b, bounds.rho, bounds.m, bounds.sigma]
@@ -109,13 +113,18 @@ def calibrate_slice(
     )
 
 
-def calibrate_all_slices(panel: pd.DataFrame, cfg: AppConfig) -> list[SVICalibrationResult]:
+def calibrate_all_slices(
+    panel: pd.DataFrame,
+    cfg: AppConfig,
+    *,
+    weight_fn: WeightFn | None = None,
+) -> list[SVICalibrationResult]:
     results: list[SVICalibrationResult] = []
     for sid, g in panel.groupby("slice_id"):
         if len(g) < cfg.calibration.min_strikes_per_slice:
             continue
         try:
-            results.append(calibrate_slice(g, cfg, str(sid)))
+            results.append(calibrate_slice(g, cfg, str(sid), weight_fn=weight_fn))
         except Exception:
             continue
     return results

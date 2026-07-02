@@ -2,11 +2,39 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 import pandas as pd
 
 from btc_vol_research.config import CalibrationConfig
 from btc_vol_research.iv.black_scholes import bs_vega
+
+WeightFn = Callable[[pd.DataFrame, CalibrationConfig, float, float], np.ndarray]
+
+
+def _normalize_weights(w: np.ndarray) -> np.ndarray:
+    n = len(w)
+    return w / (w.sum() + 1e-12) * n
+
+
+def _vega_vector(slice_df: pd.DataFrame, r: float, q: float) -> np.ndarray:
+    S0 = float(slice_df["S"].iloc[0])
+    T = float(slice_df["T"].iloc[0])
+    return np.array(
+        [
+            bs_vega(S0, float(row.K), T, r, q, float(row.iv_used))
+            for row in slice_df.itertuples()
+        ]
+    )
+
+
+def _volume_series(slice_df: pd.DataFrame) -> np.ndarray:
+    if "volume_24h" in slice_df.columns:
+        return slice_df["volume_24h"].astype(float).fillna(0).values
+    if "volume" in slice_df.columns:
+        return slice_df["volume"].astype(float).fillna(0).values
+    return np.zeros(len(slice_df))
 
 
 def calibration_weights(
@@ -15,23 +43,39 @@ def calibration_weights(
     r: float,
     q: float,
 ) -> np.ndarray:
-    """w_i ∝ vega × √OI (normalisées)."""
+    """v1 : w_i ∝ vega × √OI (normalisées)."""
     n = len(slice_df)
     w = np.ones(n)
-    S0 = float(slice_df["S"].iloc[0])
-    T = float(slice_df["T"].iloc[0])
 
     if cfg.use_vega_weight:
-        vegas = np.array(
-            [
-                bs_vega(S0, float(row.K), T, r, q, float(row.iv_used))
-                for row in slice_df.itertuples()
-            ]
-        )
-        w *= np.maximum(vegas, 1e-8)
+        w *= np.maximum(_vega_vector(slice_df, r, q), 1e-8)
 
     if cfg.use_liquidity_weight:
         oi = slice_df["open_interest"].astype(float).values
         w *= np.sqrt(np.maximum(oi, 1e-8))
 
-    return w / (w.sum() + 1e-12) * n
+    return _normalize_weights(w)
+
+
+def calibration_weights_v2(
+    slice_df: pd.DataFrame,
+    cfg: CalibrationConfig,
+    r: float,
+    q: float,
+) -> np.ndarray:
+    """v2 : w_i ∝ vega × √(1+OI) × √(1+volume) (normalisées)."""
+    n = len(slice_df)
+    w = np.ones(n)
+
+    if cfg.use_vega_weight:
+        w *= np.maximum(_vega_vector(slice_df, r, q), 1e-8)
+
+    oi = (
+        slice_df["open_interest"].astype(float).fillna(0).values
+        if "open_interest" in slice_df.columns
+        else np.zeros(n)
+    )
+    vol = _volume_series(slice_df)
+    w *= np.sqrt(oi + 1.0) * np.sqrt(vol + 1.0)
+
+    return _normalize_weights(w)

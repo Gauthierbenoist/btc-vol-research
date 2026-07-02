@@ -7,6 +7,7 @@ Recherche quantitative sur la **volatilité implicite** des options BTC (Deribit
 1. **Smiles marché** — `run_smile_analysis.py`
 2. **Baseline SVI** — `run_svi_calibration.py` (paramétrisation Gatheral, rapide)
 3. **Heston** — `run_heston_calibration.py` (modèle stochastique, plus lourd)
+4. **Merton** — `run_merton_calibration.py` (sauts, calibration **globale** sur toute la surface)
 4. **Comparaison** — `run_compare_models.py` (RMSE SVI vs Heston)
 
 ## Prérequis
@@ -29,7 +30,7 @@ python scripts/run_svi_calibration.py --date 2026-06-01
 # rho(T) + surface : toutes les maturités éligibles ; --max-slices limite seulement les PNG smile
 
 # Modèle stochastique
-python scripts/run_heston_calibration.py --date 2026-06-01 --max-slices 4
+python scripts/run_merton_calibration.py --date 2026-06-01
 
 # Tableau comparatif
 python scripts/run_compare_models.py --date 2026-06-01 --max-slices 4
@@ -43,7 +44,7 @@ Variance totale :
 `w(k) = a + b ( ρ(k−m) + √((k−m)² + σ²) )`  
 avec `k = ln(K/F)`, `σ_IV = √(w/T)`.
 
-- Calibration par maturité, même **pondération** que Heston (vega × √OI)
+- Calibration par maturité, même **pondération v1** que Heston (`calibration_weights`)
 - Contrainte **no butterfly** (condition suffisante Gatheral)
 - Courbe lisse tracée sur une grille fine de `k`
 - **Surface 3D + contour** : interpolation de `w(k)` entre tenors (`svi_surface_3d_*.png`, `svi_surface_contour_*.png`, CSV grille)
@@ -54,11 +55,14 @@ avec `k = ln(K/F)`, `σ_IV = √(w/T)`.
 ```
 src/btc_vol_research/
   models/svi/       # baseline smile
+  models/merton/    # jump-diffusion, calibration globale
+  models/calibration/  # filtres, erreurs, decoupage par maturite
   models/heston/    # QuantLib + calibration
   models/calibration_weights.py
   surfaces/         # plots
 scripts/
   run_svi_calibration.py
+  run_merton_calibration.py
   run_heston_calibration.py
   run_compare_models.py
 ```
@@ -69,7 +73,10 @@ scripts/
 |---------|--------|
 | Smile | Options **OTM** |
 | IV | `mark_iv` si mid incohérent, sinon inversion BS |
-| Poids | `vega × √OI` |
+| Poids v1 (défaut SVI/Heston) | `vega × √OI` — `calibration_weights()` |
+| Poids v2 | `vega × √(1+OI) × √(1+volume)` — `calibration_weights_v2()` |
+| Comparer v1 vs v2 (CSV) | `python scripts/compare_weight_schemes.py --date YYYY-MM-DD` |
+| Figures SVI v2 | generees par `run_svi_calibration.py` (`svi_v2_fit_*`, `svi_surface_v2_*`) |
 | Objectif | `Σ w_i (σ_model − σ_mkt)²` |
 
 Paramètres : `configs/default.yaml` (`svi:` et `heston:`).

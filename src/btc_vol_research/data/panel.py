@@ -28,11 +28,10 @@ def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = 
     )
     out["log_moneyness"] = np.log(out["K"] / out["forward"])
 
-    price_btc = out["mid_price"].where(out["mid_price"].notna(), out["mark_price"])
-    out["option_price_btc"] = price_btc
-    out["option_price_usd"] = price_btc * out["S"]
+    out["option_price_btc"] = out["mid_price"]
+    out["option_price_usd"] = out["mid_price"] * out["S"]
 
-    out["rel_spread"] = relative_spread(out["bid_price"], out["ask_price"], price_btc)
+    out["rel_spread"] = relative_spread(out["bid_price"], out["ask_price"], out["mid_price"])
     out["iv_mark"] = out["mark_iv"].astype(float)
     out["iv_mid"] = implied_volatility(
         out["option_price_usd"],

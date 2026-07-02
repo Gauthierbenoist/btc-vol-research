@@ -18,7 +18,8 @@ if str(SRC) not in sys.path:
 from btc_vol_research.config import load_config  # noqa: E402
 from btc_vol_research.data.loader import load_snapshot  # noqa: E402
 from btc_vol_research.data.panel import build_market_panel  # noqa: E402
-from btc_vol_research.models.svi.calibrate import calibrate_all_slices  # noqa: E402
+from btc_vol_research.models.calibration_weights import calibration_weights_v2  # noqa: E402
+from btc_vol_research.models.svi.calibrate import SVICalibrationResult, calibrate_all_slices  # noqa: E402
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness  # noqa: E402
 from btc_vol_research.surfaces.plots import (  # noqa: E402
     plot_calibration_fit,
@@ -49,6 +50,62 @@ def parse_args() -> argparse.Namespace:
         "rho(T), surface et CSV utilisent toutes les maturités éligibles.",
     )
     return p.parse_args()
+
+
+def _emit_svi_figures(
+    results_all: list[SVICalibrationResult],
+    results_plots: list[SVICalibrationResult],
+    panel,
+    cfg,
+    snap_str: str,
+    *,
+    file_prefix: str,
+    surface_stem: str,
+    rho_stem: str,
+    model_label: str,
+    title_suffix: str,
+) -> None:
+    """Fits par maturité, surface 3D/contour, rho(T), CSV calibration."""
+    for r in results_plots:
+        g = panel.loc[panel["slice_id"] == r.slice_id].sort_values("log_moneyness")
+        k_fine = np.linspace(g["log_moneyness"].min(), g["log_moneyness"].max(), 150)
+        iv_fine = svi_iv_from_log_moneyness(k_fine, r.T, r.params)
+        plot_calibration_fit(
+            g,
+            r.model_iv,
+            cfg.figures_dir,
+            snap_str,
+            r.slice_id,
+            model_name=model_label,
+            file_prefix=file_prefix,
+            smooth_curve=(k_fine, iv_fine),
+        )
+
+    if len(results_all) >= 2:
+        path_3d, path_contour = plot_svi_surface(
+            results_all,
+            panel,
+            cfg.figures_dir,
+            snap_str,
+            file_stem=surface_stem,
+            title_suffix=title_suffix,
+        )
+        lm_g, T_g, iv_g = build_svi_surface_grid(results_all, panel)
+        surface_csv = cfg.reports_dir / f"{surface_stem}_{snap_str}.csv"
+        surface_csv.parent.mkdir(parents=True, exist_ok=True)
+        surface_to_long_dataframe(lm_g, T_g, iv_g, snap_str).to_csv(surface_csv, index=False)
+        print(f"  Surface : {path_3d.name}, {path_contour.name} | CSV {surface_csv.name}")
+
+    ts = svi_term_structure_table(results_all)
+    rho_csv = cfg.reports_dir / f"{rho_stem}_{snap_str}.csv"
+    ts.to_csv(rho_csv, index=False)
+    plot_svi_rho_term_structure(
+        results_all,
+        cfg.figures_dir,
+        snap_str,
+        file_stem=rho_stem,
+        title_suffix=title_suffix,
+    )
 
 
 def main() -> int:
@@ -85,13 +142,6 @@ def main() -> int:
     print(table.to_string(index=False))
     print(f"\nRapport: {report_path}")
 
-    ts = svi_term_structure_table(results_all)
-    rho_csv = cfg.reports_dir / f"svi_rho_term_{snap_str}.csv"
-    rho_csv.parent.mkdir(parents=True, exist_ok=True)
-    ts.to_csv(rho_csv, index=False)
-    rho_path = plot_svi_rho_term_structure(results_all, cfg.figures_dir, snap_str)
-    print(f"rho(T) : {rho_path.name} ({len(results_all)} points) | CSV : {rho_csv.name}")
-
     atm_w = cfg.calibration.atm_zone_half_width
     mark_mid = mark_vs_mid_table(panel, atm_w)
     mark_mid_sum = mark_vs_mid_summary(panel, atm_w)
@@ -115,30 +165,50 @@ def main() -> int:
     print(f"\nDiagnostics : mark_vs_mid_{snap_str}.png, svi_rmse_by_zone_{snap_str}.png")
 
     for r in results_plots:
-        g = panel.loc[panel["slice_id"] == r.slice_id].sort_values("log_moneyness")
-        k_fine = np.linspace(g["log_moneyness"].min(), g["log_moneyness"].max(), 150)
-        iv_fine = svi_iv_from_log_moneyness(k_fine, r.T, r.params)
-        plot_calibration_fit(
-            g,
-            r.model_iv,
-            cfg.figures_dir,
-            snap_str,
-            r.slice_id,
-            model_name="SVI",
-            file_prefix="svi",
-            smooth_curve=(k_fine, iv_fine),
-        )
         rmse = r.rmse_iv if np.isfinite(r.rmse_iv) else float("nan")
-        print(f"  {r.slice_id}: RMSE IV={rmse:.4f} (pondéré {r.weighted_rmse_iv:.4f})")
+        print(f"  {r.slice_id}: RMSE IV={rmse:.4f} (pondere {r.weighted_rmse_iv:.4f})")
 
-    if len(results_all) >= 2:
-        path_3d, path_contour = plot_svi_surface(results_all, panel, cfg.figures_dir, snap_str)
-        lm_g, T_g, iv_g = build_svi_surface_grid(results_all, panel)
-        surface_csv = cfg.reports_dir / f"svi_surface_{snap_str}.csv"
-        surface_csv.parent.mkdir(parents=True, exist_ok=True)
-        surface_to_long_dataframe(lm_g, T_g, iv_g, snap_str).to_csv(surface_csv, index=False)
-        print(f"\nSurface SVI : {path_3d.name}, {path_contour.name}")
-        print(f"Grille CSV : {surface_csv}")
+    print("\n--- SVI v1 (poids vega * sqrt(OI)) ---")
+    _emit_svi_figures(
+        results_all,
+        results_plots,
+        panel,
+        cfg,
+        snap_str,
+        file_prefix="svi",
+        surface_stem="svi_surface",
+        rho_stem="svi_rho_term",
+        model_label="SVI",
+        title_suffix="",
+    )
+
+    results_w2 = calibrate_all_slices(panel, cfg, weight_fn=calibration_weights_v2)
+    if results_w2:
+        results_plots_w2 = (
+            [r for r in results_w2 if r.slice_id in keep] if args.max_slices > 0 else results_w2
+        )
+        report_w2 = write_svi_calibration_report(
+            results_w2, cfg.reports_dir, snap_str, filename_prefix="svi_calibration_v2"
+        )
+        print(f"\n--- SVI v2 (poids vega * sqrt(1+OI) * sqrt(1+volume)) : {len(results_w2)} maturites ---")
+        print(f"  Rapport: {report_w2.name}")
+        for r in results_plots_w2:
+            rmse = r.rmse_iv if np.isfinite(r.rmse_iv) else float("nan")
+            print(f"  {r.slice_id}: RMSE IV={rmse:.4f} (pondere {r.weighted_rmse_iv:.4f})")
+        _emit_svi_figures(
+            results_w2,
+            results_plots_w2,
+            panel,
+            cfg,
+            snap_str,
+            file_prefix="svi_v2",
+            surface_stem="svi_surface_v2",
+            rho_stem="svi_rho_term_v2",
+            model_label="SVI v2",
+            title_suffix=" (poids v2)",
+        )
+    else:
+        print("\nAucune tranche SVI v2 calibree.", file=sys.stderr)
 
     return 0
 
