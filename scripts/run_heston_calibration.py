@@ -32,6 +32,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     cfg = load_config()
+    fig_dir = cfg.figures_dir / "heston"
     snap = date.fromisoformat(args.date) if args.date else None
     if snap is None and cfg.snapshot_date:
         snap = date.fromisoformat(str(cfg.snapshot_date))
@@ -61,7 +62,7 @@ def main() -> int:
         plot_calibration_fit(
             g,
             r.model_iv,
-            cfg.figures_dir,
+            fig_dir,
             snap_str,
             r.slice_id,
             model_name="Heston",

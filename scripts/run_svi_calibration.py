@@ -66,6 +66,7 @@ def _emit_svi_figures(
     title_suffix: str,
 ) -> None:
     """Fits par maturité, surface 3D/contour, rho(T), CSV calibration."""
+    fig_dir = cfg.figures_dir / "svi"
     for r in results_plots:
         g = panel.loc[panel["slice_id"] == r.slice_id].sort_values("log_moneyness")
         k_fine = np.linspace(g["log_moneyness"].min(), g["log_moneyness"].max(), 150)
@@ -73,7 +74,7 @@ def _emit_svi_figures(
         plot_calibration_fit(
             g,
             r.model_iv,
-            cfg.figures_dir,
+            fig_dir,
             snap_str,
             r.slice_id,
             model_name=model_label,
@@ -85,7 +86,7 @@ def _emit_svi_figures(
         path_3d, path_contour = plot_svi_surface(
             results_all,
             panel,
-            cfg.figures_dir,
+            fig_dir,
             snap_str,
             file_stem=surface_stem,
             title_suffix=title_suffix,
@@ -101,7 +102,7 @@ def _emit_svi_figures(
     ts.to_csv(rho_csv, index=False)
     plot_svi_rho_term_structure(
         results_all,
-        cfg.figures_dir,
+        fig_dir,
         snap_str,
         file_stem=rho_stem,
         title_suffix=title_suffix,
@@ -111,6 +112,7 @@ def _emit_svi_figures(
 def main() -> int:
     args = parse_args()
     cfg = load_config()
+    fig_dir = cfg.figures_dir / "svi"
     snap = date.fromisoformat(args.date) if args.date else None
     if snap is None and cfg.snapshot_date:
         snap = date.fromisoformat(str(cfg.snapshot_date))
@@ -150,9 +152,9 @@ def main() -> int:
     mark_mid.to_csv(diag_dir / f"mark_vs_mid_by_zone_{snap_str}.csv", index=False)
     mark_mid_sum.to_csv(diag_dir / f"mark_vs_mid_summary_{snap_str}.csv", index=False)
     svi_zones.to_csv(diag_dir / f"svi_rmse_by_zone_{snap_str}.csv", index=False)
-    plot_mark_vs_mid(panel, cfg.figures_dir, snap_str, atm_w)
-    plot_svi_rmse_by_zone(svi_zones, cfg.figures_dir, snap_str)
-    plot_svi_rmse_zones_heatmap(svi_zones, cfg.figures_dir, snap_str)
+    plot_mark_vs_mid(panel, fig_dir, snap_str, atm_w)
+    plot_svi_rmse_by_zone(svi_zones, fig_dir, snap_str)
+    plot_svi_rmse_zones_heatmap(svi_zones, fig_dir, snap_str)
     print("\n=== mark_iv vs iv_mid (moyenne par zone) ===")
     print(mark_mid_sum.to_string(index=False))
     print("\n=== RMSE SVI par zone (moyenne sur maturites) ===")

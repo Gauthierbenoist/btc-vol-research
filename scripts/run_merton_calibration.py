@@ -45,6 +45,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     cfg = load_config()
+    fig_dir = cfg.figures_dir / "merton"
     snap = date.fromisoformat(args.date) if args.date else None
     if snap is None and cfg.snapshot_date:
         snap = date.fromisoformat(str(cfg.snapshot_date))
@@ -85,7 +86,7 @@ def main() -> int:
         plot_calibration_fit(
             g,
             sr.model_iv,
-            cfg.figures_dir,
+            fig_dir,
             snap_str,
             sr.slice_id,
             model_name="Merton",
@@ -99,7 +100,7 @@ def main() -> int:
         cfg.market.risk_free_rate,
         cfg.market.dividend_yield,
     )
-    surface_html = plot_merton_surface_plotly(lm_grid, t_grid, iv_grid, cfg.figures_dir, snap_str)
+    surface_html = plot_merton_surface_plotly(lm_grid, t_grid, iv_grid, fig_dir, snap_str)
     surface_csv = cfg.reports_dir / f"merton_surface_{snap_str}.csv"
     surface_to_long_dataframe(lm_grid, t_grid, iv_grid, snap_str).to_csv(surface_csv, index=False)
 

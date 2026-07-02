@@ -31,6 +31,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     cfg = load_config()
+    fig_dir = cfg.figures_dir / "svi"
 
     if args.list_dates:
         for d in list_snapshot_dates():
@@ -46,7 +47,6 @@ def main() -> int:
     panel = build_market_panel(raw, cfg)
     summary = summarize_moneyness_maturity(panel)
 
-    fig_dir = cfg.figures_dir
     snap_str = str(snapshot_date)
     paths = plot_smiles(panel, fig_dir, snap_str)
     surface_path = plot_iv_surface(panel, fig_dir, snap_str)
