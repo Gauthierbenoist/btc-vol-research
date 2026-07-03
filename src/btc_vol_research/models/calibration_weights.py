@@ -57,6 +57,33 @@ def calibration_weights(
     return _normalize_weights(w)
 
 
+def vega_only_weights(
+    slice_df: pd.DataFrame,
+    cfg: CalibrationConfig,
+    r: float,
+    q: float,
+) -> np.ndarray:
+    """Poids ∝ vega (normalisés), sans composante liquidité."""
+    del cfg
+    w = np.maximum(_vega_vector(slice_df, r, q), 1e-8)
+    return _normalize_weights(w)
+
+
+def build_panel_weights(
+    panel: pd.DataFrame,
+    weight_fn: WeightFn,
+    cfg: CalibrationConfig,
+    r: float,
+    q: float,
+) -> np.ndarray:
+    """Assemble les poids par tranche sur l'ordre du panel."""
+    w = np.zeros(len(panel), dtype=float)
+    for _, g in panel.groupby("slice_id", sort=True):
+        pos = panel.index.get_indexer(g.index)
+        w[pos] = weight_fn(g, cfg, r, q)
+    return w
+
+
 def calibration_weights_v2(
     slice_df: pd.DataFrame,
     cfg: CalibrationConfig,

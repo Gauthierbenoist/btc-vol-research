@@ -56,10 +56,12 @@ def write_merton_calibration_report(
     result: GlobalCalibrationResult[MertonParams],
     out_dir: Path,
     snapshot_date: date | str,
+    *,
+    scheme_id: str = "uniform",
 ) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
-    global_path = out_dir / f"merton_calibration_{snapshot_date}.csv"
-    slice_path = out_dir / f"merton_calibration_by_slice_{snapshot_date}.csv"
+    global_path = out_dir / f"merton_calibration_{scheme_id}_{snapshot_date}.csv"
+    slice_path = out_dir / f"merton_calibration_by_slice_{scheme_id}_{snapshot_date}.csv"
     merton_global_summary_table(result).to_csv(global_path, index=False)
     slice_fit_summary_table(result.slice_results).to_csv(slice_path, index=False)
     return global_path, slice_path

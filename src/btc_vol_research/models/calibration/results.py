@@ -30,3 +30,5 @@ class GlobalCalibrationResult(Generic[ParamsT]):
     n_points: int
     success: bool
     message: str
+    weight_scheme: str = "uniform"
+    calibration_time_s: float = 0.0

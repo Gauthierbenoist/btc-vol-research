@@ -251,6 +251,9 @@ def plot_merton_surface_plotly(
     iv_matrix: np.ndarray,
     out_dir: Path,
     snapshot_date: str,
+    *,
+    file_stem: str = "merton",
+    title_suffix: str = "",
 ) -> Path:
     """Surface 3D Merton en Plotly (HTML interactif)."""
     import plotly.graph_objects as go
@@ -268,11 +271,11 @@ def plot_merton_surface_plotly(
         ]
     )
     fig.update_layout(
-        title=f"Surface Merton — {snapshot_date}",
+        title=f"Surface Merton{title_suffix} — {snapshot_date}",
         scene=_merton_plotly_scene(z_title="IV (%)", z_range=MERTON_IV_PCT_LIM),
         margin={"l": 0, "r": 0, "b": 0, "t": 50},
     )
-    path = out_dir / f"merton_surface_3d_{snapshot_date}.html"
+    path = out_dir / f"{file_stem}_surface_3d_{snapshot_date}.html"
     fig.write_html(path, include_plotlyjs="cdn")
     return path
 
@@ -287,6 +290,8 @@ def plot_merton_iv_and_abs_error_plotly(
     *,
     rmse_pct: float,
     err_var_pct2: float,
+    file_stem: str = "merton",
+    title_suffix: str = "",
 ) -> Path:
     """IV modele + |erreur| cote a cote (Plotly) avec RMSE global et variance des ecarts."""
     from plotly.subplots import make_subplots
@@ -331,7 +336,10 @@ def plot_merton_iv_and_abs_error_plotly(
     )
     fig.update_layout(
         title={
-            "text": f"Surface Merton et erreur absolue — {snapshot_date}<br><sup>{metrics}</sup>",
+            "text": (
+                f"Surface Merton{title_suffix} et erreur absolue — {snapshot_date}"
+                f"<br><sup>{metrics}</sup>"
+            ),
             "x": 0.5,
             "xanchor": "center",
         },
@@ -339,7 +347,7 @@ def plot_merton_iv_and_abs_error_plotly(
         scene=_merton_plotly_scene(z_title="IV (%)", z_range=MERTON_IV_PCT_LIM),
         scene2=_merton_plotly_scene(z_title="|erreur| (pts vol)"),
     )
-    path = out_dir / f"merton_iv_and_abs_error_{snapshot_date}.html"
+    path = out_dir / f"{file_stem}_iv_and_abs_error_{snapshot_date}.html"
     fig.write_html(path, include_plotlyjs="cdn")
     return path
 

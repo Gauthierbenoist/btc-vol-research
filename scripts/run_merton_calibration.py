@@ -8,23 +8,28 @@ import sys
 from datetime import date
 from pathlib import Path
 
+import pandas as pd
+
 ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from btc_vol_research.config import load_config  # noqa: E402
-from btc_vol_research.data.loader import load_snapshot  # noqa: E402
-from btc_vol_research.data.panel import build_market_panel  # noqa: E402
-from btc_vol_research.models.calibration.filters import quality_filter  # noqa: E402
-from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
 from btc_vol_research.analysis.calibration_tables import (  # noqa: E402
     merton_global_summary_table,
     slice_fit_summary_table,
 )
+from btc_vol_research.analysis.merton_diagnostics import merton_slice_metrics_table  # noqa: E402
 from btc_vol_research.analysis.report import write_merton_calibration_report  # noqa: E402
+from btc_vol_research.config import load_config  # noqa: E402
+from btc_vol_research.data.loader import load_snapshot  # noqa: E402
+from btc_vol_research.data.panel import build_market_panel  # noqa: E402
 from btc_vol_research.models.calibration.errors import iv_error_variance  # noqa: E402
+from btc_vol_research.models.calibration.filters import quality_filter  # noqa: E402
+from btc_vol_research.models.calibration_weights import build_panel_weights  # noqa: E402
+from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
 from btc_vol_research.models.merton.pricer import merton_iv_panel  # noqa: E402
+from btc_vol_research.models.merton.weight_schemes import MERTON_WEIGHT_SCHEMES  # noqa: E402
 from btc_vol_research.surfaces.merton_surface import (  # noqa: E402
     abs_error_surface_to_long_dataframe,
     build_merton_abs_error_surface_grid,
@@ -52,45 +57,23 @@ def parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    cfg = load_config()
-    fig_dir = cfg.figures_dir / "merton"
-    snap = date.fromisoformat(args.date) if args.date else None
-    if snap is None and cfg.snapshot_date:
-        snap = date.fromisoformat(str(cfg.snapshot_date))
-
-    raw = load_snapshot(snap)
-    snapshot_date = raw["snapshot_date"].iloc[0]
-    snap_str = str(snapshot_date)
-    panel = build_market_panel(raw, cfg)
-
-    result = calibrate_global(panel, cfg)
-    fit_df = quality_filter(panel, min_strikes=cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
-
-    global_tbl = merton_global_summary_table(result)
+def _plot_slices(
+    result,
+    fit_df: pd.DataFrame,
+    fig_dir: Path,
+    snap_str: str,
+    *,
+    scheme_id: str,
+    scheme_label: str,
+    max_slices: int,
+) -> int:
     slice_tbl = slice_fit_summary_table(result.slice_results)
-    global_path, slice_path = write_merton_calibration_report(result, cfg.reports_dir, snap_str)
-
-    print(
-        f"Snapshot {snapshot_date} — Merton global : {result.n_points} points, "
-        f"{len(result.slice_results)} maturites"
-    )
-    print(
-        f"Calibration globale sur {len(result.slice_results)} maturites ; "
-        f"{args.max_slices if args.max_slices > 0 else len(result.slice_results)} smiles traces."
-    )
-    print("\n=== Parametres globaux ===")
-    print(global_tbl.to_string(index=False))
-    print(f"\nRapports: {global_path.name}, {slice_path.name}")
-    print("\n=== RMSE par maturite ===")
-    print(slice_tbl.to_string(index=False))
-
     plot_slices = result.slice_results
-    if args.max_slices > 0:
-        top = slice_tbl.sort_values("n_strikes", ascending=False).head(args.max_slices)["slice_id"]
+    if max_slices > 0:
+        top = slice_tbl.sort_values("n_strikes", ascending=False).head(max_slices)["slice_id"]
         plot_slices = [s for s in result.slice_results if s.slice_id in set(top)]
 
+    file_prefix = f"merton_{scheme_id}"
     for sr in plot_slices:
         g = fit_df.loc[fit_df["slice_id"] == sr.slice_id].sort_values("log_moneyness")
         plot_calibration_fit(
@@ -99,13 +82,26 @@ def main() -> int:
             fig_dir,
             snap_str,
             sr.slice_id,
-            model_name="Merton",
-            file_prefix="merton",
+            model_name=f"Merton ({scheme_label})",
+            file_prefix=file_prefix,
             xlim=MERTON_LOG_MONEYNESS_LIM,
             ylim=MERTON_IV_PCT_LIM,
         )
-        print(f"  {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
+        print(f"  [{scheme_id}] {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
+    return len(plot_slices)
 
+
+def _generate_surfaces(
+    result,
+    fit_df: pd.DataFrame,
+    fig_dir: Path,
+    reports_dir: Path,
+    snap_str: str,
+    cfg,
+    *,
+    scheme_id: str,
+    scheme_label: str,
+) -> None:
     r = cfg.market.risk_free_rate
     q = cfg.market.dividend_yield
     model_iv = merton_iv_panel(fit_df, result.params, r, q)
@@ -115,8 +111,18 @@ def main() -> int:
 
     rmse_pct = result.rmse_iv * 100.0
     err_var_pct2 = iv_error_variance(fit_df["iv_used"].values, model_iv) * 100.0**2
+    file_stem = f"merton_{scheme_id}"
+    title_suffix = f" ({scheme_label})"
 
-    surface_html = plot_merton_surface_plotly(lm_grid, t_grid, iv_grid, fig_dir, snap_str)
+    surface_html = plot_merton_surface_plotly(
+        lm_grid,
+        t_grid,
+        iv_grid,
+        fig_dir,
+        snap_str,
+        file_stem=file_stem,
+        title_suffix=title_suffix,
+    )
     dual_html = plot_merton_iv_and_abs_error_plotly(
         lm_grid,
         t_grid,
@@ -126,17 +132,107 @@ def main() -> int:
         snap_str,
         rmse_pct=rmse_pct,
         err_var_pct2=err_var_pct2,
+        file_stem=file_stem,
+        title_suffix=title_suffix,
     )
-    surface_csv = cfg.reports_dir / f"merton_surface_{snap_str}.csv"
-    err_csv = cfg.reports_dir / f"merton_abs_error_surface_{snap_str}.csv"
+    surface_csv = reports_dir / f"merton_surface_{scheme_id}_{snap_str}.csv"
+    err_csv = reports_dir / f"merton_abs_error_surface_{scheme_id}_{snap_str}.csv"
     surface_to_long_dataframe(lm_grid, t_grid, iv_grid, snap_str).to_csv(surface_csv, index=False)
     abs_error_surface_to_long_dataframe(lm_grid, t_grid, err_grid, snap_str).to_csv(err_csv, index=False)
 
-    print(f"\nFigures: merton_fit_{snap_str}_*.png ({len(plot_slices)} tranches)")
-    print(f"Surface 3D Plotly: {surface_html.name}")
-    print(f"IV + erreur absolue Plotly: {dual_html.name}")
-    print(f"RMSE global: {rmse_pct:.3f} pts vol | Var(epsilon): {err_var_pct2:.3f} (pts vol)^2")
-    print(f"CSV surface: {surface_csv.name}, {err_csv.name}")
+    print(f"  Surface 3D: {surface_html.name}")
+    print(f"  IV + erreur absolue: {dual_html.name}")
+    print(f"  RMSE global: {rmse_pct:.3f} pts vol | Var(epsilon): {err_var_pct2:.3f} (pts vol)^2")
+    print(f"  Temps calibration: {result.calibration_time_s:.2f} s")
+
+
+def main() -> int:
+    args = parse_args()
+    cfg = load_config()
+    fig_root = cfg.figures_dir / "merton"
+    snap = date.fromisoformat(args.date) if args.date else None
+    if snap is None and cfg.snapshot_date:
+        snap = date.fromisoformat(str(cfg.snapshot_date))
+
+    raw = load_snapshot(snap)
+    snapshot_date = raw["snapshot_date"].iloc[0]
+    snap_str = str(snapshot_date)
+    panel = build_market_panel(raw, cfg)
+    fit_df = quality_filter(panel, min_strikes=cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
+    atm_w = cfg.calibration.atm_zone_half_width
+    r = cfg.market.risk_free_rate
+    q = cfg.market.dividend_yield
+
+    metrics_tables: list[pd.DataFrame] = []
+
+    print(f"Snapshot {snapshot_date} — calibration Merton ({len(MERTON_WEIGHT_SCHEMES)} schemes)")
+
+    for scheme in MERTON_WEIGHT_SCHEMES:
+        print(f"\n=== Scheme {scheme.scheme_id} ({scheme.label}) ===")
+        result = calibrate_global(
+            panel,
+            cfg,
+            weight_fn=scheme.weight_fn,
+            weight_scheme=scheme.scheme_id,
+        )
+
+        global_tbl = merton_global_summary_table(result)
+        global_path, slice_path = write_merton_calibration_report(
+            result,
+            cfg.reports_dir,
+            snap_str,
+            scheme_id=scheme.scheme_id,
+        )
+        print(global_tbl.to_string(index=False))
+        print(f"Rapports: {global_path.name}, {slice_path.name}")
+
+        weights = None
+        if scheme.weight_fn is not None:
+            weights = build_panel_weights(fit_df, scheme.weight_fn, cfg.calibration, r, q)
+
+        metrics_tbl = merton_slice_metrics_table(
+            result,
+            fit_df,
+            snapshot_date=snap_str,
+            weight_scheme_label=scheme.label,
+            atm_half_width=atm_w,
+            weights=weights,
+            r=r,
+            q=q,
+        )
+        metrics_tables.append(metrics_tbl)
+
+        scheme_fig_dir = fig_root / scheme.scheme_id
+        n_plots = _plot_slices(
+            result,
+            fit_df,
+            scheme_fig_dir,
+            snap_str,
+            scheme_id=scheme.scheme_id,
+            scheme_label=scheme.label,
+            max_slices=args.max_slices,
+        )
+        print(f"  Smiles traces: {n_plots}")
+        _generate_surfaces(
+            result,
+            fit_df,
+            scheme_fig_dir,
+            cfg.reports_dir,
+            snap_str,
+            cfg,
+            scheme_id=scheme.scheme_id,
+            scheme_label=scheme.label,
+        )
+
+    metrics_path = cfg.reports_dir / f"merton_slice_metrics_{snap_str}.csv"
+    pd.concat(metrics_tables, ignore_index=True).to_csv(metrics_path, index=False)
+
+    print(f"\nCSV metriques par maturite: {metrics_path.name}")
+    print("\n=== Apercu metriques (RMSE uniforme, pts vol) ===")
+    preview = pd.concat(metrics_tables, ignore_index=True)[
+        ["weight_scheme", "slice_id", "rmse_uniform", "mae_uniform", "rmse_atm", "calibration_time_s"]
+    ]
+    print(preview.to_string(index=False))
     return 0
 
 

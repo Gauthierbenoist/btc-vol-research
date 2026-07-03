@@ -27,6 +27,8 @@ def merton_global_summary_table(result: GlobalCalibrationResult[MertonParams]) -
     return pd.DataFrame(
         [
             {
+                "weight_scheme": result.weight_scheme,
+                "calibration_time_s": result.calibration_time_s,
                 "rmse_iv": result.rmse_iv,
                 "weighted_rmse_iv": result.weighted_rmse_iv,
                 "n_points": result.n_points,

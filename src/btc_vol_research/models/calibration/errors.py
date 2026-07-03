@@ -18,6 +18,11 @@ def iv_rmse(market_iv: np.ndarray, model_iv: np.ndarray) -> float:
     return float(np.sqrt(np.mean(err**2)))
 
 
+def iv_mae(market_iv: np.ndarray, model_iv: np.ndarray) -> float:
+    err = np.asarray(model_iv) - np.asarray(market_iv)
+    return float(np.mean(np.abs(err)))
+
+
 def iv_error_variance(market_iv: np.ndarray, model_iv: np.ndarray) -> float:
     """Variance des ecarts model - market (meme unite que les IV d'entree)."""
     err = np.asarray(model_iv) - np.asarray(market_iv)
