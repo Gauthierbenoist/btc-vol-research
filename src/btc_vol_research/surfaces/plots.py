@@ -16,6 +16,21 @@ from btc_vol_research.surfaces.surface import build_iv_surface_grid
 if TYPE_CHECKING:
     from btc_vol_research.models.svi.calibrate import SVICalibrationResult
 
+# Echelles fixes des figures Merton (log-moneyness, IV en %).
+MERTON_LOG_MONEYNESS_LIM = (-1.5, 1.8)
+MERTON_IV_PCT_LIM = (30.0, 145.0)
+
+
+def _merton_plotly_scene(*, z_title: str, z_range: tuple[float, float] | None = None) -> dict:
+    scene: dict = {
+        "xaxis": {"title": "log(K/F)", "range": list(MERTON_LOG_MONEYNESS_LIM)},
+        "yaxis_title": "T (années)",
+        "zaxis": {"title": z_title},
+    }
+    if z_range is not None:
+        scene["zaxis"]["range"] = list(z_range)
+    return scene
+
 
 def plot_smiles(
     panel: pd.DataFrame,
@@ -199,6 +214,8 @@ def plot_calibration_fit(
     model_name: str = "Heston",
     file_prefix: str | None = None,
     smooth_curve: tuple[np.ndarray, np.ndarray] | None = None,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     prefix = file_prefix or model_name.lower()
@@ -215,6 +232,10 @@ def plot_calibration_fit(
     ax.set_xlabel("log(K/F)")
     ax.set_ylabel("IV (%)")
     ax.set_title(f"Calibration {model_name} — {snapshot_date} — {slice_id}")
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
     ax.legend()
     ax.grid(True, alpha=0.3)
     path = out_dir / f"{prefix}_fit_{snapshot_date}_{slice_id}.png"
@@ -248,14 +269,77 @@ def plot_merton_surface_plotly(
     )
     fig.update_layout(
         title=f"Surface Merton — {snapshot_date}",
-        scene={
-            "xaxis_title": "log(K/F)",
-            "yaxis_title": "T (années)",
-            "zaxis_title": "IV (%)",
-        },
+        scene=_merton_plotly_scene(z_title="IV (%)", z_range=MERTON_IV_PCT_LIM),
         margin={"l": 0, "r": 0, "b": 0, "t": 50},
     )
     path = out_dir / f"merton_surface_3d_{snapshot_date}.html"
+    fig.write_html(path, include_plotlyjs="cdn")
+    return path
+
+
+def plot_merton_iv_and_abs_error_plotly(
+    lm_grid: np.ndarray,
+    t_grid: np.ndarray,
+    iv_matrix: np.ndarray,
+    abs_err_matrix: np.ndarray,
+    out_dir: Path,
+    snapshot_date: str,
+    *,
+    rmse_pct: float,
+    err_var_pct2: float,
+) -> Path:
+    """IV modele + |erreur| cote a cote (Plotly) avec RMSE global et variance des ecarts."""
+    from plotly.subplots import make_subplots
+    import plotly.graph_objects as go
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        specs=[[{"type": "surface"}, {"type": "surface"}]],
+        subplot_titles=("IV Merton", "|IV marche - IV modele|"),
+        horizontal_spacing=0.05,
+    )
+    fig.add_trace(
+        go.Surface(
+            x=lm_grid,
+            y=t_grid,
+            z=iv_matrix * 100.0,
+            colorscale="Plasma",
+            colorbar={"title": "IV (%)", "len": 0.45, "x": 0.45},
+            showscale=True,
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Surface(
+            x=lm_grid,
+            y=t_grid,
+            z=abs_err_matrix,
+            colorscale="Reds",
+            colorbar={"title": "|erreur| (pts vol)", "len": 0.45, "x": 1.0},
+            showscale=True,
+        ),
+        row=1,
+        col=2,
+    )
+    metrics = (
+        f"RMSE global = {rmse_pct:.3f} pts vol | "
+        f"Var(epsilon) = {err_var_pct2:.3f} (pts vol)^2 | "
+        f"MSE = RMSE^2 = {rmse_pct**2:.3f}"
+    )
+    fig.update_layout(
+        title={
+            "text": f"Surface Merton et erreur absolue — {snapshot_date}<br><sup>{metrics}</sup>",
+            "x": 0.5,
+            "xanchor": "center",
+        },
+        margin={"l": 0, "r": 0, "b": 0, "t": 90},
+        scene=_merton_plotly_scene(z_title="IV (%)", z_range=MERTON_IV_PCT_LIM),
+        scene2=_merton_plotly_scene(z_title="|erreur| (pts vol)"),
+    )
+    path = out_dir / f"merton_iv_and_abs_error_{snapshot_date}.html"
     fig.write_html(path, include_plotlyjs="cdn")
     return path
 

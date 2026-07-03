@@ -74,3 +74,64 @@ def surface_to_long_dataframe(
                 }
             )
     return pd.DataFrame(rows)
+
+
+def build_merton_abs_error_surface_grid(
+    fit_df: pd.DataFrame,
+    model_iv: np.ndarray,
+    *,
+    n_moneyness: int = 50,
+    n_maturities: int = 30,
+    k_pad: float = 0.05,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Grille |IV marche - IV modele| (pts vol) interpolee sur (k, T)."""
+    from scipy.interpolate import griddata
+
+    if fit_df.empty:
+        raise ValueError("Panel vide pour la surface d'erreur Merton")
+
+    market_iv = fit_df["iv_used"].values.astype(float)
+    model_iv = np.asarray(model_iv, dtype=float)
+    abs_err_pts = np.abs(model_iv - market_iv) * 100.0
+
+    k = fit_df["log_moneyness"].values.astype(float)
+    t = fit_df["T"].values.astype(float)
+    k_lo = float(k.min()) - k_pad
+    k_hi = float(k.max()) + k_pad
+    t_lo = float(t.min())
+    t_hi = float(t.max())
+
+    k_lin = np.linspace(k_lo, k_hi, n_moneyness)
+    t_lin = np.linspace(t_lo, t_hi, n_maturities)
+    lm_grid, t_grid = np.meshgrid(k_lin, t_lin)
+
+    points = np.column_stack([k, t])
+    err_grid = griddata(points, abs_err_pts, (lm_grid, t_grid), method="linear")
+    if np.any(~np.isfinite(err_grid)):
+        nearest = griddata(points, abs_err_pts, (lm_grid, t_grid), method="nearest")
+        err_grid = np.where(np.isfinite(err_grid), err_grid, nearest)
+
+    return lm_grid, t_grid, err_grid
+
+
+def abs_error_surface_to_long_dataframe(
+    lm_grid: np.ndarray,
+    t_grid: np.ndarray,
+    err_matrix: np.ndarray,
+    snapshot_date: str,
+) -> pd.DataFrame:
+    rows = []
+    for i in range(lm_grid.shape[0]):
+        for j in range(lm_grid.shape[1]):
+            err = err_matrix[i, j]
+            if not np.isfinite(err):
+                continue
+            rows.append(
+                {
+                    "snapshot_date": snapshot_date,
+                    "log_moneyness": float(lm_grid[i, j]),
+                    "T_years": float(t_grid[i, j]),
+                    "abs_error_iv_pts": float(err),
+                }
+            )
+    return pd.DataFrame(rows)

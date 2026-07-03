@@ -23,11 +23,21 @@ from btc_vol_research.analysis.calibration_tables import (  # noqa: E402
     slice_fit_summary_table,
 )
 from btc_vol_research.analysis.report import write_merton_calibration_report  # noqa: E402
+from btc_vol_research.models.calibration.errors import iv_error_variance  # noqa: E402
+from btc_vol_research.models.merton.pricer import merton_iv_panel  # noqa: E402
 from btc_vol_research.surfaces.merton_surface import (  # noqa: E402
+    abs_error_surface_to_long_dataframe,
+    build_merton_abs_error_surface_grid,
     build_merton_surface_grid,
     surface_to_long_dataframe,
 )
-from btc_vol_research.surfaces.plots import plot_calibration_fit, plot_merton_surface_plotly  # noqa: E402
+from btc_vol_research.surfaces.plots import (  # noqa: E402
+    MERTON_IV_PCT_LIM,
+    MERTON_LOG_MONEYNESS_LIM,
+    plot_calibration_fit,
+    plot_merton_iv_and_abs_error_plotly,
+    plot_merton_surface_plotly,
+)
 
 
 def parse_args() -> argparse.Namespace:
@@ -91,22 +101,42 @@ def main() -> int:
             sr.slice_id,
             model_name="Merton",
             file_prefix="merton",
+            xlim=MERTON_LOG_MONEYNESS_LIM,
+            ylim=MERTON_IV_PCT_LIM,
         )
         print(f"  {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
 
-    lm_grid, t_grid, iv_grid = build_merton_surface_grid(
-        fit_df,
-        result.params,
-        cfg.market.risk_free_rate,
-        cfg.market.dividend_yield,
-    )
+    r = cfg.market.risk_free_rate
+    q = cfg.market.dividend_yield
+    model_iv = merton_iv_panel(fit_df, result.params, r, q)
+
+    lm_grid, t_grid, iv_grid = build_merton_surface_grid(fit_df, result.params, r, q)
+    _, _, err_grid = build_merton_abs_error_surface_grid(fit_df, model_iv)
+
+    rmse_pct = result.rmse_iv * 100.0
+    err_var_pct2 = iv_error_variance(fit_df["iv_used"].values, model_iv) * 100.0**2
+
     surface_html = plot_merton_surface_plotly(lm_grid, t_grid, iv_grid, fig_dir, snap_str)
+    dual_html = plot_merton_iv_and_abs_error_plotly(
+        lm_grid,
+        t_grid,
+        iv_grid,
+        err_grid,
+        fig_dir,
+        snap_str,
+        rmse_pct=rmse_pct,
+        err_var_pct2=err_var_pct2,
+    )
     surface_csv = cfg.reports_dir / f"merton_surface_{snap_str}.csv"
+    err_csv = cfg.reports_dir / f"merton_abs_error_surface_{snap_str}.csv"
     surface_to_long_dataframe(lm_grid, t_grid, iv_grid, snap_str).to_csv(surface_csv, index=False)
+    abs_error_surface_to_long_dataframe(lm_grid, t_grid, err_grid, snap_str).to_csv(err_csv, index=False)
 
     print(f"\nFigures: merton_fit_{snap_str}_*.png ({len(plot_slices)} tranches)")
     print(f"Surface 3D Plotly: {surface_html.name}")
-    print(f"CSV surface: {surface_csv.name}")
+    print(f"IV + erreur absolue Plotly: {dual_html.name}")
+    print(f"RMSE global: {rmse_pct:.3f} pts vol | Var(epsilon): {err_var_pct2:.3f} (pts vol)^2")
+    print(f"CSV surface: {surface_csv.name}, {err_csv.name}")
     return 0
 
 
