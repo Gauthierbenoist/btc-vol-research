@@ -36,6 +36,7 @@ class MarketConfig:
     max_time_to_expiry_years: float = float(os.getenv("MAX_TIME_TO_EXPIRY_YEARS", "1.0"))
     max_relative_spread: float = float(os.getenv("MAX_REL_SPREAD", "0.5"))
     smile_convention: str = "otm"
+    drop_phantom_bid_ask: bool = _env_bool("DROP_PHANTOM_BID_ASK", True)
 
 
 @dataclass(frozen=True)
@@ -75,16 +76,27 @@ class MertonBounds:
 
 
 @dataclass(frozen=True)
+class MertonConfig:
+    weight_scheme: str = "uniform"
+    bounds: MertonBounds = field(default_factory=MertonBounds)
+
+
+@dataclass(frozen=True)
 class AppConfig:
     snapshot_date: str | None = None
     postgres: PostgresConfig = field(default_factory=PostgresConfig)
     market: MarketConfig = field(default_factory=MarketConfig)
     calibration: CalibrationConfig = field(default_factory=CalibrationConfig)
     heston_bounds: HestonBounds = field(default_factory=HestonBounds)
-    merton_bounds: MertonBounds = field(default_factory=MertonBounds)
+    merton: MertonConfig = field(default_factory=MertonConfig)
     svi_bounds: SVIBounds = field(default_factory=SVIBounds)
     figures_dir: Path = PROJECT_ROOT / "outputs" / "figures"
     reports_dir: Path = PROJECT_ROOT / "outputs" / "reports"
+
+    @property
+    def merton_bounds(self) -> MertonBounds:
+        """Compatibilite tests / code legacy."""
+        return self.merton.bounds
 
 
 def _merge_yaml(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
@@ -132,6 +144,10 @@ def load_config(path: Path | None = None) -> AppConfig:
         mu_jump=tuple(merton_raw.get("mu_jump", [-1.0, 1.0])),
         sigma_jump=tuple(merton_raw.get("sigma_jump", [0.01, 1.0])),
     )
+    merton = MertonConfig(
+        weight_scheme=str(merton_raw.get("weight_scheme", "uniform")),
+        bounds=merton_bounds,
+    )
 
     market = MarketConfig(
         risk_free_rate=float(market_raw.get("risk_free_rate", os.getenv("RISK_FREE_RATE", "0.0"))),
@@ -141,6 +157,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         max_time_to_expiry_years=float(market_raw.get("max_time_to_expiry_years", 1.0)),
         max_relative_spread=float(market_raw.get("max_relative_spread", 0.5)),
         smile_convention=str(market_raw.get("smile_convention", "otm")),
+        drop_phantom_bid_ask=bool(market_raw.get("drop_phantom_bid_ask", True)),
     )
 
     calibration = CalibrationConfig(
@@ -158,7 +175,7 @@ def load_config(path: Path | None = None) -> AppConfig:
         market=market,
         calibration=calibration,
         heston_bounds=bounds,
-        merton_bounds=merton_bounds,
+        merton=merton,
         svi_bounds=svi_bounds,
         figures_dir=PROJECT_ROOT / outputs_raw.get("figures_dir", "outputs/figures"),
         reports_dir=PROJECT_ROOT / outputs_raw.get("reports_dir", "outputs/reports"),

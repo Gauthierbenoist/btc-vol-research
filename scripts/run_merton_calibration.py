@@ -29,7 +29,7 @@ from btc_vol_research.models.calibration.filters import quality_filter  # noqa: 
 from btc_vol_research.models.calibration_weights import build_panel_weights  # noqa: E402
 from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
 from btc_vol_research.models.merton.pricer import merton_iv_panel  # noqa: E402
-from btc_vol_research.models.merton.weight_schemes import MERTON_WEIGHT_SCHEMES  # noqa: E402
+from btc_vol_research.models.merton.weight_schemes import get_merton_weight_scheme  # noqa: E402
 from btc_vol_research.surfaces.merton_surface import (  # noqa: E402
     abs_error_surface_to_long_dataframe,
     build_merton_abs_error_surface_grid,
@@ -49,10 +49,21 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Calibration Merton globale sur surface IV")
     p.add_argument("--date", type=str, help="YYYY-MM-DD")
     p.add_argument(
+        "--weight-scheme",
+        type=str,
+        default="",
+        help="Ponderation erreur: uniform | vega | volume (defaut: configs/default.yaml merton.weight_scheme)",
+    )
+    p.add_argument(
         "--max-slices",
         type=int,
-        default=0,
+        default=20,
         help="Limite les PNG par maturite (0 = toutes les tranches calibrees)",
+    )
+    p.add_argument(
+        "--metrics-only",
+        action="store_true",
+        help="Calibration + CSV uniquement (pas de figures)",
     )
     return p.parse_args()
 
@@ -87,7 +98,7 @@ def _plot_slices(
             xlim=MERTON_LOG_MONEYNESS_LIM,
             ylim=MERTON_IV_PCT_LIM,
         )
-        print(f"  [{scheme_id}] {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
+        print(f"  {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
     return len(plot_slices)
 
 
@@ -146,10 +157,24 @@ def _generate_surfaces(
     print(f"  Temps calibration: {result.calibration_time_s:.2f} s")
 
 
+def _merge_metrics_csv(metrics_path: Path, metrics_tbl: pd.DataFrame, scheme_id: str) -> pd.DataFrame:
+    if metrics_path.exists():
+        prev = pd.read_csv(metrics_path)
+        prev = prev[prev["weight_scheme"] != scheme_id]
+        combined = pd.concat([prev, metrics_tbl], ignore_index=True)
+    else:
+        combined = metrics_tbl
+    combined.sort_values(["weight_scheme", "slice_id"]).to_csv(metrics_path, index=False)
+    return combined
+
+
 def main() -> int:
     args = parse_args()
     cfg = load_config()
-    fig_root = cfg.figures_dir / "merton"
+    scheme_id = args.weight_scheme.strip() or cfg.merton.weight_scheme
+    scheme = get_merton_weight_scheme(scheme_id)
+
+    fig_root = cfg.figures_dir / "merton" / scheme.scheme_id
     snap = date.fromisoformat(args.date) if args.date else None
     if snap is None and cfg.snapshot_date:
         snap = date.fromisoformat(str(cfg.snapshot_date))
@@ -162,51 +187,48 @@ def main() -> int:
     atm_w = cfg.calibration.atm_zone_half_width
     r = cfg.market.risk_free_rate
     q = cfg.market.dividend_yield
+    metrics_path = cfg.reports_dir / f"merton_slice_metrics_{snap_str}.csv"
 
-    metrics_tables: list[pd.DataFrame] = []
+    print(f"Snapshot {snapshot_date} — Merton scheme={scheme.scheme_id} ({scheme.label})")
 
-    print(f"Snapshot {snapshot_date} — calibration Merton ({len(MERTON_WEIGHT_SCHEMES)} schemes)")
+    result = calibrate_global(
+        panel,
+        cfg,
+        weight_fn=scheme.weight_fn,
+        weight_scheme=scheme.scheme_id,
+    )
 
-    for scheme in MERTON_WEIGHT_SCHEMES:
-        print(f"\n=== Scheme {scheme.scheme_id} ({scheme.label}) ===")
-        result = calibrate_global(
-            panel,
-            cfg,
-            weight_fn=scheme.weight_fn,
-            weight_scheme=scheme.scheme_id,
-        )
+    global_tbl = merton_global_summary_table(result)
+    global_path, slice_path = write_merton_calibration_report(
+        result,
+        cfg.reports_dir,
+        snap_str,
+        scheme_id=scheme.scheme_id,
+    )
+    print(global_tbl.to_string(index=False))
+    print(f"Rapports: {global_path.name}, {slice_path.name}")
 
-        global_tbl = merton_global_summary_table(result)
-        global_path, slice_path = write_merton_calibration_report(
-            result,
-            cfg.reports_dir,
-            snap_str,
-            scheme_id=scheme.scheme_id,
-        )
-        print(global_tbl.to_string(index=False))
-        print(f"Rapports: {global_path.name}, {slice_path.name}")
+    weights = None
+    if scheme.weight_fn is not None:
+        weights = build_panel_weights(fit_df, scheme.weight_fn, cfg.calibration, r, q)
 
-        weights = None
-        if scheme.weight_fn is not None:
-            weights = build_panel_weights(fit_df, scheme.weight_fn, cfg.calibration, r, q)
+    metrics_tbl = merton_slice_metrics_table(
+        result,
+        fit_df,
+        snapshot_date=snap_str,
+        weight_scheme_label=scheme.label,
+        atm_half_width=atm_w,
+        weights=weights,
+        r=r,
+        q=q,
+    )
+    full_metrics = _merge_metrics_csv(metrics_path, metrics_tbl, scheme.scheme_id)
 
-        metrics_tbl = merton_slice_metrics_table(
-            result,
-            fit_df,
-            snapshot_date=snap_str,
-            weight_scheme_label=scheme.label,
-            atm_half_width=atm_w,
-            weights=weights,
-            r=r,
-            q=q,
-        )
-        metrics_tables.append(metrics_tbl)
-
-        scheme_fig_dir = fig_root / scheme.scheme_id
+    if not args.metrics_only:
         n_plots = _plot_slices(
             result,
             fit_df,
-            scheme_fig_dir,
+            fig_root,
             snap_str,
             scheme_id=scheme.scheme_id,
             scheme_label=scheme.label,
@@ -216,7 +238,7 @@ def main() -> int:
         _generate_surfaces(
             result,
             fit_df,
-            scheme_fig_dir,
+            fig_root,
             cfg.reports_dir,
             snap_str,
             cfg,
@@ -224,14 +246,11 @@ def main() -> int:
             scheme_label=scheme.label,
         )
 
-    metrics_path = cfg.reports_dir / f"merton_slice_metrics_{snap_str}.csv"
-    pd.concat(metrics_tables, ignore_index=True).to_csv(metrics_path, index=False)
-
     print(f"\nCSV metriques par maturite: {metrics_path.name}")
-    print("\n=== Apercu metriques (RMSE uniforme, pts vol) ===")
-    preview = pd.concat(metrics_tables, ignore_index=True)[
+    preview = full_metrics.loc[full_metrics["weight_scheme"] == scheme.scheme_id][
         ["weight_scheme", "slice_id", "rmse_uniform", "mae_uniform", "rmse_atm", "calibration_time_s"]
     ]
+    print("\n=== Metriques (RMSE uniforme, pts vol) ===")
     print(preview.to_string(index=False))
     return 0
 

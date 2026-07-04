@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
-from btc_vol_research.config import AppConfig, MertonBounds  # noqa: E402
+from btc_vol_research.config import AppConfig, MertonBounds, MertonConfig  # noqa: E402
 from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
 from btc_vol_research.models.merton.params import MertonParams  # noqa: E402
 from btc_vol_research.models.merton.pricer import merton_iv_row, merton_option_price  # noqa: E402
@@ -61,7 +61,7 @@ def test_merton_global_calibration_toy_panel():
                 }
             )
     panel = pd.DataFrame(rows)
-    cfg = AppConfig(merton_bounds=MertonBounds())
+    cfg = AppConfig(merton=MertonConfig(bounds=MertonBounds()))
     result = calibrate_global(panel, cfg)
     assert result.n_points == len(panel)
     assert len(result.slice_results) == 2

@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
-from btc_vol_research.config import AppConfig, CalibrationConfig, MertonBounds  # noqa: E402
+from btc_vol_research.config import AppConfig, CalibrationConfig, MertonBounds, MertonConfig  # noqa: E402
 from btc_vol_research.models.calibration.slice_metrics import slice_iv_diagnostics  # noqa: E402
 from btc_vol_research.models.calibration_weights import vega_only_weights  # noqa: E402
 from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
@@ -58,13 +58,25 @@ def test_vega_only_weights_positive():
 
 
 def test_merton_weight_schemes_registry():
-    ids = {s.scheme_id for s in MERTON_WEIGHT_SCHEMES}
-    assert ids == {"uniform", "vega"}
+    from btc_vol_research.models.merton.weight_schemes import get_merton_weight_scheme
+
+    for sid in ("uniform", "vega", "volume"):
+        assert get_merton_weight_scheme(sid).scheme_id == sid
+
+
+def test_volume_only_weights_positive():
+    df = _toy_panel().iloc[:6]
+    from btc_vol_research.models.calibration_weights import volume_only_weights
+
+    w = volume_only_weights(df, CalibrationConfig(), 0.0, 0.0)
+    assert len(w) == len(df)
+    assert np.all(w > 0)
+    assert abs(w.sum() - len(df)) < 1e-6
 
 
 def test_merton_global_calibration_vega_weighted():
     panel = _toy_panel()
-    cfg = AppConfig(merton_bounds=MertonBounds())
+    cfg = AppConfig(merton=MertonConfig(bounds=MertonBounds()))
     vega_scheme = next(s for s in MERTON_WEIGHT_SCHEMES if s.scheme_id == "vega")
     result = calibrate_global(panel, cfg, weight_fn=vega_scheme.weight_fn, weight_scheme="vega")
     assert result.weight_scheme == "vega"

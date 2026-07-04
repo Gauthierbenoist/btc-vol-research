@@ -7,26 +7,52 @@ import pandas as pd
 
 from btc_vol_research.models.calibration.results import GlobalCalibrationResult, SliceFitResult
 from btc_vol_research.models.calibration.slice_metrics import slice_iv_diagnostics
-from btc_vol_research.models.calibration_weights import _vega_vector
+from btc_vol_research.models.calibration_weights import _vega_vector, _volume_series
 from btc_vol_research.models.merton.params import MertonParams
 
+_NAN_WEIGHT_COLS = {
+    "vega_mean": float("nan"),
+    "vega_min": float("nan"),
+    "vega_max": float("nan"),
+    "volume_mean": float("nan"),
+    "volume_min": float("nan"),
+    "volume_max": float("nan"),
+    "weight_mean": float("nan"),
+    "weight_min": float("nan"),
+    "weight_max": float("nan"),
+}
 
-def _vega_weight_stats(
+
+def _weight_stats(
     slice_df: pd.DataFrame,
     weights: np.ndarray,
+    weight_scheme: str,
     r: float,
     q: float,
 ) -> dict[str, float]:
-    vegas = _vega_vector(slice_df, r, q)
     w = np.asarray(weights, dtype=float)
-    return {
-        "vega_mean": float(np.mean(vegas)),
-        "vega_min": float(np.min(vegas)),
-        "vega_max": float(np.max(vegas)),
+    stats = {
         "weight_mean": float(np.mean(w)),
         "weight_min": float(np.min(w)),
         "weight_max": float(np.max(w)),
+        "vega_mean": float("nan"),
+        "vega_min": float("nan"),
+        "vega_max": float("nan"),
+        "volume_mean": float("nan"),
+        "volume_min": float("nan"),
+        "volume_max": float("nan"),
     }
+    if weight_scheme == "vega":
+        vegas = _vega_vector(slice_df, r, q)
+        stats["vega_mean"] = float(np.mean(vegas))
+        stats["vega_min"] = float(np.min(vegas))
+        stats["vega_max"] = float(np.max(vegas))
+    elif weight_scheme == "volume":
+        vols = _volume_series(slice_df)
+        stats["volume_mean"] = float(np.mean(vols))
+        stats["volume_min"] = float(np.min(vols))
+        stats["volume_max"] = float(np.max(vols))
+    return stats
 
 
 def merton_slice_metrics_row(
@@ -59,18 +85,9 @@ def merton_slice_metrics_row(
         "max_error_iv": diag["max_error_iv"] * 100.0,
     }
     if weights is not None and slice_df is not None:
-        row.update(_vega_weight_stats(slice_df, weights, r, q))
+        row.update(_weight_stats(slice_df, weights, weight_scheme, r, q))
     else:
-        row.update(
-            {
-                "vega_mean": float("nan"),
-                "vega_min": float("nan"),
-                "vega_max": float("nan"),
-                "weight_mean": float("nan"),
-                "weight_min": float("nan"),
-                "weight_max": float("nan"),
-            }
-        )
+        row.update(_NAN_WEIGHT_COLS)
     return row
 
 

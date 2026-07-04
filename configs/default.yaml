@@ -9,6 +9,7 @@ market:
   max_time_to_expiry_years: 1.0
   max_relative_spread: 0.5
   smile_convention: otm  # otm | calls | puts | all
+  drop_phantom_bid_ask: true  # options fantomes : exclure si bid NaN ou ask NaN
 
 calibration:
   atm_zone_half_width: 0.10   # diagnostics RMSE par zone uniquement
@@ -38,6 +39,7 @@ heston:
     rho: -0.5
 
 merton:
+  weight_scheme: uniform   # uniform | vega | volume
   sigma: [0.05, 2.0]
   lambda_jump: [0.0, 10.0]
   mu_jump: [-1.0, 1.0]

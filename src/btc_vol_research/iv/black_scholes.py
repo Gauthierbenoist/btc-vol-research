@@ -45,6 +45,58 @@ def bs_vega(S: float, K: float, T: float, r: float, q: float, sigma: float) -> f
     return float(S * np.exp(-q * T) * norm.pdf(d1) * np.sqrt(T))
 
 
+def bs_call_price_vec(
+    S: np.ndarray,
+    K: np.ndarray,
+    T: np.ndarray,
+    r: float,
+    q: float,
+    sigma: np.ndarray,
+) -> np.ndarray:
+    T = np.maximum(np.asarray(T, dtype=float), 1e-10)
+    sigma = np.maximum(np.asarray(sigma, dtype=float), 1e-10)
+    S = np.asarray(S, dtype=float)
+    K = np.asarray(K, dtype=float)
+    vol_sqrt_t = sigma * np.sqrt(T)
+    d1 = (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / vol_sqrt_t
+    d2 = d1 - vol_sqrt_t
+    return S * np.exp(-q * T) * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
+
+
+def bs_put_price_vec(
+    S: np.ndarray,
+    K: np.ndarray,
+    T: np.ndarray,
+    r: float,
+    q: float,
+    sigma: np.ndarray,
+) -> np.ndarray:
+    T = np.maximum(np.asarray(T, dtype=float), 1e-10)
+    sigma = np.maximum(np.asarray(sigma, dtype=float), 1e-10)
+    S = np.asarray(S, dtype=float)
+    K = np.asarray(K, dtype=float)
+    vol_sqrt_t = sigma * np.sqrt(T)
+    d1 = (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / vol_sqrt_t
+    d2 = d1 - vol_sqrt_t
+    return K * np.exp(-r * T) * norm.cdf(-d2) - S * np.exp(-q * T) * norm.cdf(-d1)
+
+
+def bs_vega_vec(
+    S: np.ndarray,
+    K: np.ndarray,
+    T: np.ndarray,
+    r: float,
+    q: float,
+    sigma: np.ndarray,
+) -> np.ndarray:
+    T = np.maximum(np.asarray(T, dtype=float), 1e-10)
+    sigma = np.maximum(np.asarray(sigma, dtype=float), 1e-10)
+    S = np.asarray(S, dtype=float)
+    K = np.asarray(K, dtype=float)
+    d1 = (np.log(S / K) + (r - q + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+    return S * np.exp(-q * T) * norm.pdf(d1) * np.sqrt(T)
+
+
 def implied_volatility(
     price: np.ndarray,
     S: np.ndarray,
@@ -57,7 +109,7 @@ def implied_volatility(
     max_iter: int = 60,
     tol: float = 1e-7,
 ) -> np.ndarray:
-    """Inversion Newton-Raphson vectorisée (NaN si échec)."""
+    """Inversion Newton-Raphson vectorisee (NaN si echec)."""
     price = np.asarray(price, dtype=float)
     S = np.asarray(S, dtype=float)
     K = np.asarray(K, dtype=float)
@@ -65,32 +117,48 @@ def implied_volatility(
     opt = np.asarray(option_type)
     n = len(price)
     iv = np.full(n, np.nan)
+    is_call = np.char.lower(opt.astype(str)) == "call"
 
-    for i in range(n):
-        p, s, k, t = price[i], S[i], K[i], T[i]
-        if not np.isfinite(p) or p <= 0 or t <= 0 or s <= 0 or k <= 0:
-            continue
-        is_call = str(opt[i]).lower() == "call"
-        intrinsic = max(s * np.exp(-q * t) - k * np.exp(-r * t), 0.0) if is_call else max(
-            k * np.exp(-r * t) - s * np.exp(-q * t), 0.0
+    valid = np.isfinite(price) & (price > 0) & (T > 0) & (S > 0) & (K > 0)
+    intrinsic = np.where(
+        is_call,
+        np.maximum(S * np.exp(-q * T) - K * np.exp(-r * T), 0.0),
+        np.maximum(K * np.exp(-r * T) - S * np.exp(-q * T), 0.0),
+    )
+    valid &= price >= intrinsic * 0.999
+
+    sigma = np.full(n, 0.8)
+    active = valid.copy()
+
+    for _ in range(max_iter):
+        if not np.any(active):
+            break
+        model = np.where(
+            is_call,
+            bs_call_price_vec(S, K, T, r, q, sigma),
+            bs_put_price_vec(S, K, T, r, q, sigma),
         )
-        if p < intrinsic * 0.999:
-            continue
-        sigma = 0.8
-        for _ in range(max_iter):
-            if is_call:
-                model = bs_call_price(s, k, t, r, q, sigma)
-            else:
-                model = bs_put_price(s, k, t, r, q, sigma)
-            diff = model - p
-            if abs(diff) < tol:
-                iv[i] = sigma
-                break
-            v = bs_vega(s, k, t, r, q, sigma)
-            if v < 1e-12:
-                break
-            sigma = max(min(sigma - diff / v, 5.0), 1e-4)
-        else:
-            if abs(diff) < tol * 10:
-                iv[i] = sigma
+        diff = model - price
+        converged = active & (np.abs(diff) < tol)
+        iv[converged] = sigma[converged]
+        active &= ~converged
+        if not np.any(active):
+            break
+        vega = bs_vega_vec(S, K, T, r, q, sigma)
+        sigma = np.where(
+            active,
+            np.clip(sigma - diff / np.maximum(vega, 1e-12), 1e-4, 5.0),
+            sigma,
+        )
+
+    loose = valid & np.isnan(iv)
+    if np.any(loose):
+        model = np.where(
+            is_call,
+            bs_call_price_vec(S, K, T, r, q, sigma),
+            bs_put_price_vec(S, K, T, r, q, sigma),
+        )
+        diff = model - price
+        iv[loose & (np.abs(diff) < tol * 10)] = sigma[loose & (np.abs(diff) < tol * 10)]
+
     return iv

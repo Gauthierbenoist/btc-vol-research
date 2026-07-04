@@ -69,6 +69,19 @@ def vega_only_weights(
     return _normalize_weights(w)
 
 
+def volume_only_weights(
+    slice_df: pd.DataFrame,
+    cfg: CalibrationConfig,
+    r: float,
+    q: float,
+) -> np.ndarray:
+    """Poids ∝ √(1 + volume) (normalisés)."""
+    del cfg, r, q
+    vol = _volume_series(slice_df)
+    w = np.sqrt(vol + 1.0)
+    return _normalize_weights(np.maximum(w, 1e-8))
+
+
 def build_panel_weights(
     panel: pd.DataFrame,
     weight_fn: WeightFn,

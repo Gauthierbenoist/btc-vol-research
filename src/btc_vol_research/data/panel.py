@@ -57,6 +57,9 @@ def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = 
         & (out["iv_used"] > 0)
         & (out["rel_spread"].isna() | (out["rel_spread"] <= market.max_relative_spread))
     )
+    if market.drop_phantom_bid_ask:
+        # options fantomes : pas de cote bid/ask exploitable
+        mask &= out["bid_price"].notna() & out["ask_price"].notna()
     out = out.loc[mask].copy()
     out = apply_smile_convention(out, market.smile_convention)
     out["slice_id"] = out["maturity_date"].dt.strftime("%Y-%m-%d")
