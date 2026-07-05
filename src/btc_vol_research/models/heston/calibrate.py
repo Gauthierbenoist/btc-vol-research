@@ -58,7 +58,11 @@ def calibrate_slice(
     if len(slice_df) < calib.min_strikes_per_slice:
         raise ValueError(f"Slice {sid}: seulement {len(slice_df)} strikes (min {calib.min_strikes_per_slice})")
 
-    slice_df = quality_filter(slice_df, min_strikes=calib.min_strikes_per_slice)
+    slice_df = quality_filter(
+        slice_df,
+        min_strikes=calib.min_strikes_per_slice,
+        t_max_years=market.max_time_to_expiry_years,
+    )
 
     S0 = float(slice_df["S"].iloc[0])
     T = float(slice_df["T"].iloc[0])

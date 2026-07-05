@@ -178,7 +178,11 @@ def main() -> int:
     snapshot_date = raw["snapshot_date"].iloc[0]
     snap_str = str(snapshot_date)
     panel = build_market_panel(raw, cfg)
-    fit_df = quality_filter(panel, min_strikes=cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
+    fit_df = quality_filter(
+        panel,
+        min_strikes=cfg.calibration.min_strikes_per_slice,
+        t_max_years=cfg.market.max_time_to_expiry_years,
+    ).reset_index(drop=True)
     atm_w = cfg.calibration.atm_zone_half_width
     r = cfg.market.risk_free_rate
     q = cfg.market.dividend_yield
