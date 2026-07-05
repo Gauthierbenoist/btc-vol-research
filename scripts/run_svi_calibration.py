@@ -18,13 +18,8 @@ from btc_vol_research.models.svi.calibrate import SVICalibrationResult, calibrat
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness
 from btc_vol_research.surfaces.plots import (
     plot_calibration_fit,
-    plot_svi_rmse_by_zone,
-    plot_svi_rmse_zones_heatmap,
     plot_svi_rho_term_structure,
     plot_svi_surface,
-)
-from btc_vol_research.analysis.iv_diagnostics import (
-    svi_rmse_by_zone,
 )
 from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table
 from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid, surface_to_long_dataframe
@@ -135,21 +130,6 @@ def main() -> int:
     print(f"  (smiles PNG : {len(results_plots)})\n")
     print(table.to_string(index=False))
     print(f"\nRapport: {report_path}")
-
-    atm_w = cfg.calibration.atm_zone_half_width
-    svi_zones = svi_rmse_by_zone(results_all, atm_w)
-    diag_dir = cfg.reports_dir
-    svi_zones.to_csv(diag_dir / f"svi_rmse_by_zone_{snap_str}.csv", index=False)
-    plot_svi_rmse_by_zone(svi_zones, fig_dir, snap_str)
-    plot_svi_rmse_zones_heatmap(svi_zones, fig_dir, snap_str)
-    print("\n=== RMSE SVI par zone (moyenne sur maturites) ===")
-    print(
-        svi_zones.groupby("zone")[["rmse_svi", "bias_model_minus_mkt"]]
-        .mean()
-        .assign(rmse_svi_pct=lambda d: d["rmse_svi"] * 100)
-        .to_string()
-    )
-    print(f"\nDiagnostics : svi_rmse_by_zone_{snap_str}.png")
 
     for r in results_plots:
         rmse = r.rmse_iv if np.isfinite(r.rmse_iv) else float("nan")

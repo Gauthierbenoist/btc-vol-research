@@ -43,7 +43,6 @@ class MarketConfig:
 
 @dataclass(frozen=True)
 class CalibrationConfig:
-    atm_zone_half_width: float = float(os.getenv("CALIB_ATM_ZONE_WIDTH", "0.10"))
     use_vega_weight: bool = _env_bool("CALIB_USE_VEGA_WEIGHT", True)
     use_liquidity_weight: bool = _env_bool("CALIB_USE_LIQUIDITY_WEIGHT", True)
     min_strikes_per_slice: int = 5
@@ -165,7 +164,6 @@ def load_config(path: Path | None = None) -> AppConfig:
     )
 
     calibration = CalibrationConfig(
-        atm_zone_half_width=float(calib_raw.get("atm_zone_half_width", 0.10)),
         use_vega_weight=bool(calib_raw.get("use_vega_weight", True)),
         use_liquidity_weight=bool(calib_raw.get("use_liquidity_weight", True)),
         min_strikes_per_slice=int(calib_raw.get("min_strikes_per_slice", 5)),

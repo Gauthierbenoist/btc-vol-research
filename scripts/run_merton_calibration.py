@@ -176,7 +176,6 @@ def main() -> int:
     snap_str = str(snapshot_date)
     panel = build_market_panel(raw, cfg)
     fit_df = quality_filter(panel, cfg, min_strikes=cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
-    atm_w = cfg.calibration.atm_zone_half_width
     r = cfg.market.risk_free_rate
     q = cfg.market.dividend_yield
     metrics_path = cfg.reports_dir / f"merton_slice_metrics_{snap_str}.csv"
@@ -209,7 +208,6 @@ def main() -> int:
         fit_df,
         snapshot_date=snap_str,
         weight_scheme_label=scheme.label,
-        atm_half_width=atm_w,
         weights=weights,
         r=r,
         q=q,
@@ -240,7 +238,7 @@ def main() -> int:
 
     print(f"\nCSV metriques par maturite: {metrics_path.name}")
     preview = full_metrics.loc[full_metrics["weight_scheme"] == scheme.scheme_id][
-        ["weight_scheme", "slice_id", "rmse_uniform", "rmse_atm", "calibration_time_s"]
+        ["weight_scheme", "slice_id", "rmse_uniform", "calibration_time_s"]
     ]
     print("\n=== Metriques (RMSE uniforme, pts vol) ===")
     print(preview.to_string(index=False))

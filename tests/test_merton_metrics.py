@@ -11,7 +11,6 @@ SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
 from btc_vol_research.config import AppConfig, CalibrationConfig, MertonBounds, MertonConfig  # noqa: E402
-from btc_vol_research.models.calibration.slice_metrics import slice_iv_diagnostics  # noqa: E402
 from btc_vol_research.models.calibration_weights import vega_only_weights  # noqa: E402
 from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
 from btc_vol_research.models.merton.weight_schemes import MERTON_WEIGHT_SCHEMES  # noqa: E402
@@ -34,18 +33,6 @@ def _toy_panel() -> pd.DataFrame:
                 }
             )
     return pd.DataFrame(rows)
-
-
-def test_slice_iv_diagnostics_zones():
-    lm = np.array([-0.2, -0.05, 0.0, 0.05, 0.2])
-    mkt = np.full(5, 0.5)
-    mdl = mkt + np.array([0.02, 0.01, 0.0, 0.01, 0.03])
-    diag = slice_iv_diagnostics(lm, mkt, mdl, atm_half_width=0.10)
-    assert diag["rmse_uniform"] > 0
-    assert abs(diag["max_error_iv"] - 0.03) < 1e-12
-    assert np.isfinite(diag["rmse_atm"])
-    assert np.isfinite(diag["rmse_left_wing"])
-    assert np.isfinite(diag["rmse_right_wing"])
 
 
 def test_vega_only_weights_positive():

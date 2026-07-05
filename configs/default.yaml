@@ -14,7 +14,6 @@ market:
   drop_phantom_bid_ask: true  # options fantomes : exclure si bid NaN ou ask NaN
 
 calibration:
-  atm_zone_half_width: 0.10   # diagnostics RMSE par zone uniquement
   use_vega_weight: true
   use_liquidity_weight: true
   min_strikes_per_slice: 5

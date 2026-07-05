@@ -5,8 +5,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from btc_vol_research.models.calibration.errors import iv_rmse
 from btc_vol_research.models.calibration.results import GlobalCalibrationResult, SliceFitResult
-from btc_vol_research.models.calibration.slice_metrics import slice_iv_diagnostics
 from btc_vol_research.models.calibration_weights import _vega_vector, _volume_series
 from btc_vol_research.models.merton.params import MertonParams
 
@@ -61,14 +61,14 @@ def merton_slice_metrics_row(
     snapshot_date: str,
     weight_scheme: str,
     weight_scheme_label: str,
-    atm_half_width: float,
     calibration_time_s: float,
     slice_df: pd.DataFrame | None = None,
     weights: np.ndarray | None = None,
     r: float = 0.0,
     q: float = 0.0,
 ) -> dict:
-    diag = slice_iv_diagnostics(sr.log_moneyness, sr.market_iv, sr.model_iv, atm_half_width)
+    mkt = np.asarray(sr.market_iv, dtype=float)
+    mdl = np.asarray(sr.model_iv, dtype=float)
     row = {
         "snapshot_date": snapshot_date,
         "weight_scheme": weight_scheme,
@@ -77,11 +77,8 @@ def merton_slice_metrics_row(
         "T_years": sr.T,
         "n_strikes": len(sr.market_iv),
         "calibration_time_s": calibration_time_s,
-        "rmse_uniform": diag["rmse_uniform"] * 100.0,
-        "rmse_atm": diag["rmse_atm"] * 100.0,
-        "rmse_left_wing": diag["rmse_left_wing"] * 100.0,
-        "rmse_right_wing": diag["rmse_right_wing"] * 100.0,
-        "max_error_iv": diag["max_error_iv"] * 100.0,
+        "rmse_uniform": iv_rmse(mkt, mdl) * 100.0,
+        "max_error_iv": float(np.max(np.abs(mdl - mkt))) * 100.0,
     }
     if weights is not None and slice_df is not None:
         row.update(_weight_stats(slice_df, weights, weight_scheme, r, q))
@@ -96,7 +93,6 @@ def merton_slice_metrics_table(
     *,
     snapshot_date: str,
     weight_scheme_label: str,
-    atm_half_width: float,
     weights: np.ndarray | None = None,
     r: float = 0.0,
     q: float = 0.0,
@@ -114,7 +110,6 @@ def merton_slice_metrics_table(
                 snapshot_date=snapshot_date,
                 weight_scheme=result.weight_scheme,
                 weight_scheme_label=weight_scheme_label,
-                atm_half_width=atm_half_width,
                 calibration_time_s=result.calibration_time_s,
                 slice_df=g,
                 weights=w_slice,
