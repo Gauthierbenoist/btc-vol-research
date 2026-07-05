@@ -10,7 +10,6 @@ market:
   max_relative_spread: 0.5
   min_iv: 0.05   # borne basse IV acceptee (calibration + panel)
   max_iv: 3.0    # borne haute IV acceptee (calibration + panel)
-  smile_convention: otm  # otm | calls | puts | all
   drop_phantom_bid_ask: true  # options fantomes : exclure si bid NaN ou ask NaN
 
 calibration:

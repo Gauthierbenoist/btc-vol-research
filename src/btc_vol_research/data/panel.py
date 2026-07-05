@@ -6,8 +6,8 @@ import numpy as np
 import pandas as pd
 
 from btc_vol_research.config import AppConfig, MarketConfig
+from btc_vol_research.data.filters import relative_spread, select_otm
 from btc_vol_research.iv.black_scholes import forward_price
-from btc_vol_research.iv.conventions import apply_smile_convention, relative_spread
 
 
 def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = None) -> pd.DataFrame:
@@ -41,6 +41,6 @@ def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = 
         # options fantomes : pas de cote bid/ask exploitable
         mask &= out["bid_price"].notna() & out["ask_price"].notna()
     out = out.loc[mask].copy()
-    out = apply_smile_convention(out, market.smile_convention)
+    out = select_otm(out)  # OTM systématique (calls K>F, puts K<F) — liquidité
     out["slice_id"] = out["maturity_date"].dt.strftime("%Y-%m-%d")
     return out.reset_index(drop=True)
