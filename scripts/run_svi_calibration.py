@@ -10,18 +10,13 @@ from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from btc_vol_research.config import load_config  # noqa: E402
-from btc_vol_research.data.loader import load_snapshot  # noqa: E402
-from btc_vol_research.data.panel import build_market_panel  # noqa: E402
-from btc_vol_research.models.calibration_weights import calibration_weights_v2  # noqa: E402
-from btc_vol_research.models.svi.calibrate import SVICalibrationResult, calibrate_all_slices  # noqa: E402
-from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness  # noqa: E402
-from btc_vol_research.surfaces.plots import (  # noqa: E402
+from btc_vol_research.config import load_config
+from btc_vol_research.data.loader import load_snapshot
+from btc_vol_research.data.panel import build_market_panel
+from btc_vol_research.models.calibration_weights import calibration_weights_v2
+from btc_vol_research.models.svi.calibrate import SVICalibrationResult, calibrate_all_slices
+from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness
+from btc_vol_research.surfaces.plots import (
     plot_calibration_fit,
     plot_mark_vs_mid,
     plot_svi_rmse_by_zone,
@@ -29,14 +24,14 @@ from btc_vol_research.surfaces.plots import (  # noqa: E402
     plot_svi_rho_term_structure,
     plot_svi_surface,
 )
-from btc_vol_research.analysis.iv_diagnostics import (  # noqa: E402
+from btc_vol_research.analysis.iv_diagnostics import (
     mark_vs_mid_summary,
     mark_vs_mid_table,
     svi_rmse_by_zone,
 )
-from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table  # noqa: E402
-from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid, surface_to_long_dataframe  # noqa: E402
-from btc_vol_research.analysis.report import write_svi_calibration_report  # noqa: E402
+from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table
+from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid, surface_to_long_dataframe
+from btc_vol_research.analysis.report import write_svi_calibration_report
 
 
 def parse_args() -> argparse.Namespace:

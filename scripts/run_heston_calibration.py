@@ -8,18 +8,13 @@ import sys
 from datetime import date
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from btc_vol_research.config import load_config  # noqa: E402
-from btc_vol_research.data.loader import load_snapshot  # noqa: E402
-from btc_vol_research.data.panel import build_market_panel  # noqa: E402
-from btc_vol_research.models.heston.calibrate import calibrate_all_slices  # noqa: E402
-from btc_vol_research.surfaces.plots import plot_calibration_fit  # noqa: E402
-from btc_vol_research.analysis.report import write_calibration_report  # noqa: E402
-from btc_vol_research.analysis.metrics import calibration_summary_table  # noqa: E402
+from btc_vol_research.config import load_config
+from btc_vol_research.data.loader import load_snapshot
+from btc_vol_research.data.panel import build_market_panel
+from btc_vol_research.models.heston.calibrate import calibrate_all_slices
+from btc_vol_research.surfaces.plots import plot_calibration_fit
+from btc_vol_research.analysis.report import write_calibration_report
+from btc_vol_research.analysis.metrics import calibration_summary_table
 
 
 def parse_args() -> argparse.Namespace:

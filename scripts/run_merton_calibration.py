@@ -10,33 +10,28 @@ from pathlib import Path
 
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
-SRC = ROOT / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
-
-from btc_vol_research.analysis.calibration_tables import (  # noqa: E402
+from btc_vol_research.analysis.calibration_tables import (
     merton_global_summary_table,
     slice_fit_summary_table,
 )
-from btc_vol_research.analysis.merton_diagnostics import merton_slice_metrics_table  # noqa: E402
-from btc_vol_research.analysis.report import write_merton_calibration_report  # noqa: E402
-from btc_vol_research.config import load_config  # noqa: E402
-from btc_vol_research.data.loader import load_snapshot  # noqa: E402
-from btc_vol_research.data.panel import build_market_panel  # noqa: E402
-from btc_vol_research.models.calibration.errors import iv_error_variance  # noqa: E402
-from btc_vol_research.models.calibration.filters import quality_filter  # noqa: E402
-from btc_vol_research.models.calibration_weights import build_panel_weights  # noqa: E402
-from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
-from btc_vol_research.models.merton.pricer import merton_iv_panel  # noqa: E402
-from btc_vol_research.models.merton.weight_schemes import get_merton_weight_scheme  # noqa: E402
-from btc_vol_research.surfaces.merton_surface import (  # noqa: E402
+from btc_vol_research.analysis.merton_diagnostics import merton_slice_metrics_table
+from btc_vol_research.analysis.report import write_merton_calibration_report
+from btc_vol_research.config import load_config
+from btc_vol_research.data.loader import load_snapshot
+from btc_vol_research.data.panel import build_market_panel
+from btc_vol_research.models.calibration.errors import iv_error_variance
+from btc_vol_research.models.calibration.filters import quality_filter
+from btc_vol_research.models.calibration_weights import build_panel_weights
+from btc_vol_research.models.merton.calibrate import calibrate_global
+from btc_vol_research.models.merton.pricer import merton_iv_panel
+from btc_vol_research.models.merton.weight_schemes import get_merton_weight_scheme
+from btc_vol_research.surfaces.merton_surface import (
     abs_error_surface_to_long_dataframe,
     build_merton_abs_error_surface_grid,
     build_merton_surface_grid,
     surface_to_long_dataframe,
 )
-from btc_vol_research.surfaces.plots import (  # noqa: E402
+from btc_vol_research.surfaces.plots import (
     MERTON_IV_PCT_LIM,
     MERTON_LOG_MONEYNESS_LIM,
     plot_calibration_fit,
