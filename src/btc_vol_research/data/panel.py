@@ -7,7 +7,7 @@ import pandas as pd
 
 from btc_vol_research.config import AppConfig, MarketConfig
 from btc_vol_research.data.filters import relative_spread, select_otm
-from btc_vol_research.iv.black_scholes import forward_price
+from btc_vol_research.market.forward import forward_price
 
 
 def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = None) -> pd.DataFrame:

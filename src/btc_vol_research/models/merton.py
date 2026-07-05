@@ -1,13 +1,52 @@
-"""Prix européens Merton jump-diffusion (série de Poisson × Black–Scholes)."""
+"""Merton (1976) jump-diffusion — paramètres et pricer (série de Poisson × Black-Scholes)."""
 
 from __future__ import annotations
+
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 from scipy.special import factorial
 
-from btc_vol_research.iv.black_scholes import bs_call_price_vec, bs_put_price_vec, implied_volatility
-from btc_vol_research.models.merton.params import MertonParams
+from btc_vol_research.market.implied_vol import implied_volatility
+from btc_vol_research.models.black_scholes import bs_call_price_vec, bs_put_price_vec
+
+
+@dataclass(frozen=True)
+class MertonParams:
+    """
+    Sauts log-normaux : ln(S+/S) ~ N(mu_jump, sigma_jump^2).
+
+    - sigma : volatilité de diffusion
+    - lambda_jump : intensité des sauts (par an)
+    - mu_jump : moyenne du saut log
+    - sigma_jump : écart-type du saut log
+    """
+
+    sigma: float
+    lambda_jump: float
+    mu_jump: float
+    sigma_jump: float
+
+    def as_array(self) -> np.ndarray:
+        return np.array([self.sigma, self.lambda_jump, self.mu_jump, self.sigma_jump])
+
+    @classmethod
+    def from_array(cls, x: np.ndarray) -> MertonParams:
+        return cls(sigma=x[0], lambda_jump=x[1], mu_jump=x[2], sigma_jump=x[3])
+
+    def jump_compensation(self) -> float:
+        """k = E[exp(J) - 1] pour la dérive compensée."""
+        return float(np.exp(self.mu_jump + 0.5 * self.sigma_jump**2) - 1.0)
+
+    def is_valid(self, eps: float = 1e-8) -> bool:
+        return (
+            self.sigma > eps
+            and self.lambda_jump >= 0.0
+            and self.sigma_jump >= 0.0
+            and np.isfinite(self.as_array()).all()
+        )
+
 
 _MAX_POISSON_TERMS = 60
 _POISSON_FACTORS = factorial(np.arange(_MAX_POISSON_TERMS, dtype=float))
@@ -88,31 +127,6 @@ def merton_option_price(
             option_types=np.array([option_type]),
         )[0]
     )
-
-
-def merton_iv_row(
-    S0: float,
-    K: float,
-    T: float,
-    params: MertonParams,
-    r: float,
-    q: float,
-    option_type: str,
-) -> float:
-    iv = merton_iv_panel(
-        pd.DataFrame(
-            {
-                "S": [S0],
-                "K": [K],
-                "T": [T],
-                "option_type": [option_type],
-            }
-        ),
-        params,
-        r,
-        q,
-    )
-    return float(iv[0])
 
 
 def merton_iv_panel(

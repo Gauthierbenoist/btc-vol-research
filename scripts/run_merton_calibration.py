@@ -10,25 +10,20 @@ from pathlib import Path
 
 import pandas as pd
 
-from btc_vol_research.analysis.calibration_tables import (
-    merton_global_summary_table,
-    slice_fit_summary_table,
-)
 from btc_vol_research.analysis.merton_diagnostics import merton_slice_metrics_table
 from btc_vol_research.analysis.report import write_merton_calibration_report
+from btc_vol_research.analysis.tables import merton_global_summary_table, slice_fit_summary_table
+from btc_vol_research.calibration.filters import quality_filter
+from btc_vol_research.calibration.merton import calibrate_global
+from btc_vol_research.calibration.weights import build_panel_weights, get_merton_weight_scheme
 from btc_vol_research.config import load_config
 from btc_vol_research.data.loader import load_snapshot
 from btc_vol_research.data.panel import build_market_panel
-from btc_vol_research.models.calibration.filters import quality_filter
-from btc_vol_research.models.calibration_weights import build_panel_weights
-from btc_vol_research.models.merton.calibrate import calibrate_global
-from btc_vol_research.models.merton.pricer import merton_iv_panel
-from btc_vol_research.models.merton.weight_schemes import get_merton_weight_scheme
+from btc_vol_research.models.merton import merton_iv_panel
+from btc_vol_research.surfaces.export import grid_to_long_dataframe
 from btc_vol_research.surfaces.merton_surface import (
-    abs_error_surface_to_long_dataframe,
     build_merton_abs_error_surface_grid,
     build_merton_surface_grid,
-    surface_to_long_dataframe,
 )
 from btc_vol_research.surfaces.plots import (
     MERTON_IV_PCT_LIM,
@@ -140,8 +135,8 @@ def _generate_surfaces(
     )
     surface_csv = reports_dir / f"merton_surface_{scheme_id}_{snap_str}.csv"
     err_csv = reports_dir / f"merton_abs_error_surface_{scheme_id}_{snap_str}.csv"
-    surface_to_long_dataframe(lm_grid, t_grid, iv_grid, snap_str).to_csv(surface_csv, index=False)
-    abs_error_surface_to_long_dataframe(lm_grid, t_grid, err_grid, snap_str).to_csv(err_csv, index=False)
+    grid_to_long_dataframe(lm_grid, t_grid, iv_grid, snap_str, "iv_merton").to_csv(surface_csv, index=False)
+    grid_to_long_dataframe(lm_grid, t_grid, err_grid, snap_str, "abs_error_iv_pts").to_csv(err_csv, index=False)
 
     print(f"  Surface 3D: {surface_html.name}")
     print(f"  IV + erreur absolue: {dual_html.name}")

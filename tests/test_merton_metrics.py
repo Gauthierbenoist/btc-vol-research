@@ -10,10 +10,12 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
+from btc_vol_research.calibration.merton import calibrate_global  # noqa: E402
+from btc_vol_research.calibration.weights import (  # noqa: E402
+    MERTON_WEIGHT_SCHEMES,
+    vega_only_weights,
+)
 from btc_vol_research.config import AppConfig, CalibrationConfig, MertonBounds, MertonConfig  # noqa: E402
-from btc_vol_research.models.calibration_weights import vega_only_weights  # noqa: E402
-from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
-from btc_vol_research.models.merton.weight_schemes import MERTON_WEIGHT_SCHEMES  # noqa: E402
 
 
 def _toy_panel() -> pd.DataFrame:
@@ -44,7 +46,7 @@ def test_vega_only_weights_positive():
 
 
 def test_merton_weight_schemes_registry():
-    from btc_vol_research.models.merton.weight_schemes import get_merton_weight_scheme
+    from btc_vol_research.calibration.weights import get_merton_weight_scheme
 
     for sid in ("uniform", "vega", "volume"):
         assert get_merton_weight_scheme(sid).scheme_id == sid
@@ -52,7 +54,7 @@ def test_merton_weight_schemes_registry():
 
 def test_volume_only_weights_positive():
     df = _toy_panel().iloc[:6]
-    from btc_vol_research.models.calibration_weights import volume_only_weights
+    from btc_vol_research.calibration.weights import volume_only_weights
 
     w = volume_only_weights(df, CalibrationConfig(), 0.0, 0.0)
     assert len(w) == len(df)

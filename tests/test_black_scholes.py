@@ -10,7 +10,8 @@ import numpy as np
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from btc_vol_research.iv.black_scholes import bs_call_price, implied_volatility  # noqa: E402
+from btc_vol_research.market.implied_vol import implied_volatility  # noqa: E402
+from btc_vol_research.models.black_scholes import bs_call_price  # noqa: E402
 
 
 def test_iv_roundtrip():

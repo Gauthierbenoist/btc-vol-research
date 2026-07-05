@@ -1,1 +1,1 @@
-"""Modèles de volatilité stochastique."""
+"""Modèles de pricing : Black-Scholes, SVI, Merton, Heston."""

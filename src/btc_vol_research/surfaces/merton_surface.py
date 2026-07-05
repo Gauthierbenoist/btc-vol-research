@@ -5,9 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from btc_vol_research.models.merton.params import MertonParams
-from btc_vol_research.models.merton.pricer import merton_iv_panel
-from btc_vol_research.surfaces.surface import grid_surface_to_long_dataframe
+from btc_vol_research.models.merton import MertonParams, merton_iv_panel
 
 
 def build_merton_surface_grid(
@@ -54,17 +52,6 @@ def build_merton_surface_grid(
     return lm_grid, t_grid, iv
 
 
-def surface_to_long_dataframe(
-    lm_grid: np.ndarray,
-    t_grid: np.ndarray,
-    iv_matrix: np.ndarray,
-    snapshot_date: str,
-) -> pd.DataFrame:
-    return grid_surface_to_long_dataframe(
-        lm_grid, t_grid, iv_matrix, snapshot_date, value_col="iv_merton"
-    )
-
-
 def build_merton_abs_error_surface_grid(
     fit_df: pd.DataFrame,
     model_iv: np.ndarray,
@@ -101,14 +88,3 @@ def build_merton_abs_error_surface_grid(
         err_grid = np.where(np.isfinite(err_grid), err_grid, nearest)
 
     return lm_grid, t_grid, err_grid
-
-
-def abs_error_surface_to_long_dataframe(
-    lm_grid: np.ndarray,
-    t_grid: np.ndarray,
-    err_matrix: np.ndarray,
-    snapshot_date: str,
-) -> pd.DataFrame:
-    return grid_surface_to_long_dataframe(
-        lm_grid, t_grid, err_matrix, snapshot_date, value_col="abs_error_iv_pts"
-    )

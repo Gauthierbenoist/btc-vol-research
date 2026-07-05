@@ -10,10 +10,18 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
+from btc_vol_research.calibration.merton import calibrate_global  # noqa: E402
 from btc_vol_research.config import AppConfig, MertonBounds, MertonConfig  # noqa: E402
-from btc_vol_research.models.merton.calibrate import calibrate_global  # noqa: E402
-from btc_vol_research.models.merton.params import MertonParams  # noqa: E402
-from btc_vol_research.models.merton.pricer import merton_iv_row, merton_option_price  # noqa: E402
+from btc_vol_research.models.merton import (  # noqa: E402
+    MertonParams,
+    merton_iv_panel,
+    merton_option_price,
+)
+
+
+def _iv_single(S: float, K: float, T: float, p: MertonParams, r: float, q: float, opt: str) -> float:
+    panel = pd.DataFrame({"S": [S], "K": [K], "T": [T], "option_type": [opt]})
+    return float(merton_iv_panel(panel, p, r, q)[0])
 
 
 def test_merton_call_positive():
@@ -40,8 +48,8 @@ def test_merton_put_call_parity_and_iv_consistency():
     parity_gap = call - put - (S * np.exp(-q * T) - K * np.exp(-r * T))
     assert abs(parity_gap) < 1e-6
 
-    iv_call = merton_iv_row(S, K, T, p, r, q, "call")
-    iv_put = merton_iv_row(S, K, T, p, r, q, "put")
+    iv_call = _iv_single(S, K, T, p, r, q, "call")
+    iv_put = _iv_single(S, K, T, p, r, q, "put")
     assert abs(iv_call - iv_put) < 1e-6
 
 

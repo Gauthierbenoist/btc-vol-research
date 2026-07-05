@@ -8,13 +8,13 @@ import sys
 from datetime import date
 from pathlib import Path
 
+from btc_vol_research.analysis.report import write_heston_calibration_report
+from btc_vol_research.analysis.tables import heston_summary_table
+from btc_vol_research.calibration.heston import calibrate_all_slices
 from btc_vol_research.config import load_config
 from btc_vol_research.data.loader import load_snapshot
 from btc_vol_research.data.panel import build_market_panel
-from btc_vol_research.models.heston.calibrate import calibrate_all_slices
 from btc_vol_research.surfaces.plots import plot_calibration_fit
-from btc_vol_research.analysis.report import write_calibration_report
-from btc_vol_research.analysis.metrics import calibration_summary_table
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,8 +47,8 @@ def main() -> int:
         print("Aucune tranche calibrée — vérifiez les filtres ou MIN strikes.", file=sys.stderr)
         return 1
 
-    table = calibration_summary_table(results)
-    report_path = write_calibration_report(results, cfg.reports_dir, snap_str)
+    table = heston_summary_table(results)
+    report_path = write_heston_calibration_report(results, cfg.reports_dir, snap_str)
     print(table.to_string(index=False))
     print(f"\nRapport: {report_path}")
 

@@ -8,19 +8,17 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from btc_vol_research.calibration.errors import iv_rmse, sse_objective
+from btc_vol_research.calibration.filters import quality_filter
+from btc_vol_research.calibration.results import GlobalCalibrationResult
+from btc_vol_research.calibration.slices import atm_row, build_slice_fits
+from btc_vol_research.calibration.weights import WeightFn, build_panel_weights
 from btc_vol_research.config import AppConfig, MertonBounds
-from btc_vol_research.models.calibration.errors import iv_rmse, sse_objective
-from btc_vol_research.models.calibration.filters import quality_filter
-from btc_vol_research.models.calibration.results import GlobalCalibrationResult
-from btc_vol_research.models.calibration.slice_fits import build_slice_fits
-from btc_vol_research.models.calibration_weights import WeightFn, build_panel_weights
-from btc_vol_research.models.merton.params import MertonParams
-from btc_vol_research.models.merton.pricer import merton_iv_panel
+from btc_vol_research.models.merton import MertonParams, merton_iv_panel
 
 
 def _initial_guess(panel: pd.DataFrame, bounds: MertonBounds) -> MertonParams:
-    atm_row = panel.loc[panel["log_moneyness"].abs().idxmin()]
-    atm_iv = float(atm_row["iv_used"])
+    atm_iv = float(atm_row(panel)["iv_used"])
     return MertonParams(
         sigma=np.clip(atm_iv * 0.85, *bounds.sigma),
         lambda_jump=np.clip(1.0, *bounds.lambda_jump),
@@ -35,7 +33,7 @@ def calibrate_global(
     *,
     weight_fn: WeightFn | None = None,
     weight_scheme: str = "uniform",
-) -> GlobalCalibrationResult:
+) -> GlobalCalibrationResult[MertonParams]:
     """
     Un seul jeu de paramètres Merton sur toutes les maturités/strikes.
     Objectif : somme des w_i (sigma_model - sigma_mkt)^2 (w_i = 1 si uniforme).
@@ -88,14 +86,11 @@ def calibrate_global(
         market.risk_free_rate,
         market.dividend_yield,
     )
-    slice_results = build_slice_fits(fit_df, model_iv, weights=weights)
-
-    rmse = iv_rmse(market_iv, model_iv)
 
     return GlobalCalibrationResult(
         params=params_opt,
-        rmse_iv=rmse,
-        slice_results=slice_results,
+        rmse_iv=iv_rmse(market_iv, model_iv),
+        slice_results=build_slice_fits(fit_df, model_iv),
         n_points=len(fit_df),
         success=bool(res.success),
         message=str(res.message),

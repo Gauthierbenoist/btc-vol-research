@@ -8,8 +8,11 @@ from pathlib import Path
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from btc_vol_research.models.heston.params import HestonParams  # noqa: E402
-from btc_vol_research.models.heston.pricer import heston_call_price, heston_iv_grid  # noqa: E402
+from btc_vol_research.models.heston import (  # noqa: E402
+    HestonParams,
+    heston_call_price,
+    heston_iv_grid,
+)
 
 
 def test_heston_call_positive():

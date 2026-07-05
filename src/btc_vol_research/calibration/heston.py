@@ -2,35 +2,22 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from btc_vol_research.calibration.errors import iv_rmse, sse_objective
+from btc_vol_research.calibration.filters import quality_filter
+from btc_vol_research.calibration.results import SliceCalibrationResult
+from btc_vol_research.calibration.slices import atm_row
+from btc_vol_research.calibration.slices import calibrate_all_slices as _run_all_slices
+from btc_vol_research.calibration.weights import WeightFn, calibration_weights
 from btc_vol_research.config import AppConfig, HestonBounds
-from btc_vol_research.models.calibration.errors import iv_rmse, sse_objective
-from btc_vol_research.models.calibration.filters import quality_filter
-from btc_vol_research.models.heston.params import HestonParams
-from btc_vol_research.models.heston.pricer import heston_iv_grid
-from btc_vol_research.models.calibration_weights import WeightFn, calibration_weights
-
-
-@dataclass
-class CalibrationResult:
-    slice_id: str
-    params: HestonParams
-    rmse_iv: float
-    market_iv: np.ndarray
-    model_iv: np.ndarray
-    strikes: np.ndarray
-    success: bool
-    message: str
+from btc_vol_research.models.heston import HestonParams, heston_iv_grid
 
 
 def _initial_guess(slice_df: pd.DataFrame, bounds: HestonBounds) -> HestonParams:
-    atm_iv = float(slice_df.loc[slice_df["log_moneyness"].abs().idxmin(), "iv_used"])
+    atm_iv = float(atm_row(slice_df)["iv_used"])
     var = max(atm_iv**2, 0.01)
     return HestonParams(
         v0=np.clip(var, *bounds.v0),
@@ -47,15 +34,12 @@ def calibrate_slice(
     slice_id: str | None = None,
     *,
     weight_fn: WeightFn | None = None,
-) -> CalibrationResult:
+) -> SliceCalibrationResult[HestonParams]:
     """Minimise Σ w_i (σ_model - σ_mkt)² sur une maturité."""
     calib = cfg.calibration
     market = cfg.market
     bounds = cfg.heston_bounds
     sid = slice_id or str(slice_df["slice_id"].iloc[0])
-
-    if len(slice_df) < calib.min_strikes_per_slice:
-        raise ValueError(f"Slice {sid}: seulement {len(slice_df)} strikes (min {calib.min_strikes_per_slice})")
 
     slice_df = quality_filter(slice_df, cfg, min_strikes=calib.min_strikes_per_slice)
 
@@ -63,6 +47,7 @@ def calibrate_slice(
     T = float(slice_df["T"].iloc[0])
     strikes = slice_df["K"].values.astype(float)
     market_iv = slice_df["iv_used"].values.astype(float)
+    option_types = slice_df["option_type"].values
     w_fn = weight_fn or calibration_weights
     weights = w_fn(slice_df, calib, market.risk_free_rate, market.dividend_yield)
 
@@ -81,7 +66,7 @@ def calibrate_slice(
                 params,
                 market.risk_free_rate,
                 market.dividend_yield,
-                slice_df["option_type"].values,
+                option_types,
             )
         except Exception:
             return calib.feller_penalty
@@ -99,17 +84,17 @@ def calibrate_slice(
         params_opt,
         market.risk_free_rate,
         market.dividend_yield,
-        slice_df["option_type"].values,
+        option_types,
     )
-    rmse = iv_rmse(market_iv, model_iv)
 
-    return CalibrationResult(
+    return SliceCalibrationResult(
         slice_id=sid,
         params=params_opt,
-        rmse_iv=rmse,
+        rmse_iv=iv_rmse(market_iv, model_iv),
         market_iv=market_iv,
         model_iv=model_iv,
-        strikes=strikes,
+        log_moneyness=slice_df["log_moneyness"].values.astype(float),
+        T=T,
         success=bool(res.success),
         message=str(res.message),
     )
@@ -120,13 +105,5 @@ def calibrate_all_slices(
     cfg: AppConfig,
     *,
     weight_fn: WeightFn | None = None,
-) -> list[CalibrationResult]:
-    results: list[CalibrationResult] = []
-    for sid, g in panel.groupby("slice_id"):
-        if len(g) < cfg.calibration.min_strikes_per_slice:
-            continue
-        try:
-            results.append(calibrate_slice(g, cfg, str(sid), weight_fn=weight_fn))
-        except Exception:
-            continue
-    return results
+) -> list[SliceCalibrationResult[HestonParams]]:
+    return _run_all_slices(panel, cfg, calibrate_slice, weight_fn=weight_fn)

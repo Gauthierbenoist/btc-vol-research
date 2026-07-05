@@ -35,7 +35,7 @@ def price_rmse(
     de reconstruire un "prix marché" via Black-Scholes(market_iv) — cela évite un aller-retour
     BS inutile et reflète l'erreur réelle de trading/hedging, indépendante des poids de calibration.
     """
-    from btc_vol_research.iv.black_scholes import bs_call_price_vec, bs_put_price_vec
+    from btc_vol_research.models.black_scholes import bs_call_price_vec, bs_put_price_vec
 
     S = np.asarray(S, dtype=float)
     model_iv = np.asarray(model_iv, dtype=float)

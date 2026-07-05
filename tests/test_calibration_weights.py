@@ -3,12 +3,12 @@
 import numpy as np
 import pandas as pd
 
-from btc_vol_research.config import CalibrationConfig
-from btc_vol_research.models.calibration_weights import (
+from btc_vol_research.calibration.weights import (
     _vega_vector,
     calibration_weights,
     calibration_weights_v2,
 )
+from btc_vol_research.config import CalibrationConfig
 
 
 def _slice_df() -> pd.DataFrame:
@@ -25,7 +25,7 @@ def _slice_df() -> pd.DataFrame:
 
 
 def test_vega_vector_matches_scalar_bs_vega():
-    from btc_vol_research.iv.black_scholes import bs_vega
+    from btc_vol_research.market.greeks import bs_vega
 
     df = _slice_df()
     vec = _vega_vector(df, 0.0, 0.0)

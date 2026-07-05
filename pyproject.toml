@@ -51,8 +51,10 @@ Repository = "https://github.com/Gauthierbenoist/btc-vol-research.git"
 Issues = "https://github.com/Gauthierbenoist/btc-vol-research/issues"
 
 [tool.setuptools]
-packages = ["btc_vol_research"]
 package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.black]
 line-length = 120

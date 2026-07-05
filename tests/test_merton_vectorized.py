@@ -10,10 +10,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SRC = ROOT / "src"
 sys.path.insert(0, str(SRC))
 
-from btc_vol_research.models.merton.params import MertonParams  # noqa: E402
-from btc_vol_research.models.merton.pricer import (  # noqa: E402
+from btc_vol_research.models.merton import (  # noqa: E402
+    MertonParams,
     merton_iv_panel,
-    merton_iv_row,
     merton_option_price,
     merton_option_prices,
 )
@@ -51,4 +50,5 @@ def test_vectorized_iv_panel_finite():
     iv = merton_iv_panel(panel, p, 0.0, 0.0)
     assert iv.shape == (3,)
     assert np.all(np.isfinite(iv))
-    assert abs(iv[1] - merton_iv_row(100_000.0, 100_000.0, 0.4, p, 0.0, 0.0, "call")) < 1e-6
+    single = pd.DataFrame({"S": [100_000.0], "K": [100_000.0], "T": [0.4], "option_type": ["call"]})
+    assert abs(iv[1] - float(merton_iv_panel(single, p, 0.0, 0.0)[0])) < 1e-6

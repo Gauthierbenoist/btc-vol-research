@@ -1,45 +1,33 @@
-"""Rapports texte / CSV."""
+"""Rapports CSV de calibration."""
 
 from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
 
-import pandas as pd
-
-from btc_vol_research.models.heston.calibrate import CalibrationResult
-from btc_vol_research.models.merton.calibrate import GlobalCalibrationResult
-from btc_vol_research.models.merton.params import MertonParams
-from btc_vol_research.analysis.calibration_tables import (
+from btc_vol_research.analysis.tables import (
+    heston_summary_table,
     merton_global_summary_table,
     slice_fit_summary_table,
+    svi_summary_table,
 )
-from btc_vol_research.models.svi.calibrate import SVICalibrationResult
-from btc_vol_research.analysis.metrics import calibration_summary_table
-from btc_vol_research.analysis.svi_metrics import svi_summary_table
+from btc_vol_research.calibration.results import GlobalCalibrationResult, SliceCalibrationResult
 
 
-def write_smile_report(summary: pd.DataFrame, out_path: Path, snapshot_date: date | str) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    summary.to_csv(out_path, index=False)
-    lines = [f"# Smile summary — {snapshot_date}", "", summary.to_string(index=False)]
-    out_path.with_suffix(".txt").write_text("\n".join(lines), encoding="utf-8")
-
-
-def write_calibration_report(
-    results: list[CalibrationResult],
+def write_heston_calibration_report(
+    results: list[SliceCalibrationResult],
     out_dir: Path,
     snapshot_date: date | str,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
-    table = calibration_summary_table(results)
+    table = heston_summary_table(results)
     path = out_dir / f"heston_calibration_{snapshot_date}.csv"
     table.to_csv(path, index=False)
     return path
 
 
 def write_svi_calibration_report(
-    results: list[SVICalibrationResult],
+    results: list[SliceCalibrationResult],
     out_dir: Path,
     snapshot_date: date | str,
     *,
@@ -53,7 +41,7 @@ def write_svi_calibration_report(
 
 
 def write_merton_calibration_report(
-    result: GlobalCalibrationResult[MertonParams],
+    result: GlobalCalibrationResult,
     out_dir: Path,
     snapshot_date: date | str,
     *,

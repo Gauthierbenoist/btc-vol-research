@@ -10,20 +10,22 @@ from pathlib import Path
 
 import numpy as np
 
+from btc_vol_research.analysis.report import write_svi_calibration_report
+from btc_vol_research.analysis.tables import svi_summary_table, svi_term_structure_table
+from btc_vol_research.calibration.results import SliceCalibrationResult
+from btc_vol_research.calibration.svi import calibrate_all_slices
+from btc_vol_research.calibration.weights import calibration_weights_v2
 from btc_vol_research.config import load_config
 from btc_vol_research.data.loader import load_snapshot
 from btc_vol_research.data.panel import build_market_panel
-from btc_vol_research.models.calibration_weights import calibration_weights_v2
-from btc_vol_research.models.svi.calibrate import SVICalibrationResult, calibrate_all_slices
-from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness
+from btc_vol_research.models.svi import svi_iv_from_log_moneyness
+from btc_vol_research.surfaces.export import grid_to_long_dataframe
 from btc_vol_research.surfaces.plots import (
     plot_calibration_fit,
     plot_svi_rho_term_structure,
     plot_svi_surface,
 )
-from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table
-from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid, surface_to_long_dataframe
-from btc_vol_research.analysis.report import write_svi_calibration_report
+from btc_vol_research.surfaces.svi_surface import build_svi_surface_grid
 
 
 def parse_args() -> argparse.Namespace:
@@ -40,8 +42,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def _emit_svi_figures(
-    results_all: list[SVICalibrationResult],
-    results_plots: list[SVICalibrationResult],
+    results_all: list[SliceCalibrationResult],
+    results_plots: list[SliceCalibrationResult],
     panel,
     cfg,
     snap_str: str,
@@ -81,7 +83,7 @@ def _emit_svi_figures(
         lm_g, T_g, iv_g = build_svi_surface_grid(results_all, panel)
         surface_csv = cfg.reports_dir / f"{surface_stem}_{snap_str}.csv"
         surface_csv.parent.mkdir(parents=True, exist_ok=True)
-        surface_to_long_dataframe(lm_g, T_g, iv_g, snap_str).to_csv(surface_csv, index=False)
+        grid_to_long_dataframe(lm_g, T_g, iv_g, snap_str, "iv_svi").to_csv(surface_csv, index=False)
         print(f"  Surface : {path_3d.name}, {path_contour.name} | CSV {surface_csv.name}")
 
     ts = svi_term_structure_table(results_all)

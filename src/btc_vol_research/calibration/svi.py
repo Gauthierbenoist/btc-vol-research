@@ -2,47 +2,23 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-from dataclasses import dataclass
-
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from btc_vol_research.calibration.filters import quality_filter
+from btc_vol_research.calibration.results import SliceCalibrationResult
+from btc_vol_research.calibration.slices import atm_row
+from btc_vol_research.calibration.slices import calibrate_all_slices as _run_all_slices
+from btc_vol_research.calibration.weights import WeightFn, calibration_weights
 from btc_vol_research.config import AppConfig, SVIBounds
-from btc_vol_research.models.calibration_weights import WeightFn, calibration_weights
-from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness, svi_total_variance
-from btc_vol_research.models.svi.params import SVIParams
-
-
-@dataclass
-class SVICalibrationResult:
-    slice_id: str
-    params: SVIParams
-    rmse_iv: float
-    market_iv: np.ndarray
-    model_iv: np.ndarray
-    log_moneyness: np.ndarray
-    T: float
-    success: bool
-    message: str
-
-
-def _filter_slice(slice_df: pd.DataFrame, min_strikes: int, sid: str) -> pd.DataFrame:
-    if len(slice_df) < min_strikes:
-        raise ValueError(f"Slice {sid}: seulement {len(slice_df)} strikes")
-    out = slice_df.loc[
-        slice_df["iv_used"].between(0.05, 3.0) & slice_df["T"].between(1 / 365, 2.0)
-    ].copy()
-    if len(out) < min_strikes:
-        raise ValueError(f"Slice {sid}: pas assez de quotes après filtre qualité")
-    return out
+from btc_vol_research.models.svi import SVIParams, svi_iv_from_log_moneyness, svi_total_variance
 
 
 def _initial_guess(slice_df: pd.DataFrame, T: float, bounds: SVIBounds) -> SVIParams:
-    atm_row = slice_df.loc[slice_df["log_moneyness"].abs().idxmin()]
-    atm_iv = float(atm_row["iv_used"])
-    m = float(atm_row["log_moneyness"])
+    atm = atm_row(slice_df)
+    atm_iv = float(atm["iv_used"])
+    m = float(atm["log_moneyness"])
     w_atm = max(atm_iv**2 * T, 1e-4)
     return SVIParams(
         a=np.clip(0.8 * w_atm, *bounds.a),
@@ -59,13 +35,13 @@ def calibrate_slice(
     slice_id: str | None = None,
     *,
     weight_fn: WeightFn | None = None,
-) -> SVICalibrationResult:
+) -> SliceCalibrationResult[SVIParams]:
     """Minimise Σ w_i (σ_SVI(k_i) - σ_mkt,i)²."""
     calib = cfg.calibration
     market = cfg.market
     bounds = cfg.svi_bounds
     sid = slice_id or str(slice_df["slice_id"].iloc[0])
-    slice_df = _filter_slice(slice_df, calib.min_strikes_per_slice, sid)
+    slice_df = quality_filter(slice_df, cfg, min_strikes=calib.min_strikes_per_slice)
 
     T = float(slice_df["T"].iloc[0])
     k = slice_df["log_moneyness"].values.astype(float)
@@ -97,7 +73,7 @@ def calibrate_slice(
     err = model_iv - market_iv
     rmse = float(np.sqrt(np.mean(err**2)))
 
-    return SVICalibrationResult(
+    return SliceCalibrationResult(
         slice_id=sid,
         params=params_opt,
         rmse_iv=rmse,
@@ -115,13 +91,5 @@ def calibrate_all_slices(
     cfg: AppConfig,
     *,
     weight_fn: WeightFn | None = None,
-) -> list[SVICalibrationResult]:
-    results: list[SVICalibrationResult] = []
-    for sid, g in panel.groupby("slice_id"):
-        if len(g) < cfg.calibration.min_strikes_per_slice:
-            continue
-        try:
-            results.append(calibrate_slice(g, cfg, str(sid), weight_fn=weight_fn))
-        except Exception:
-            continue
-    return results
+) -> list[SliceCalibrationResult[SVIParams]]:
+    return _run_all_slices(panel, cfg, calibrate_slice, weight_fn=weight_fn)

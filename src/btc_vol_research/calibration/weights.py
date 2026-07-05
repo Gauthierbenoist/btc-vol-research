@@ -1,14 +1,15 @@
-"""Pondérations communes SVI / Heston."""
+"""Pondérations de calibration (vega, liquidité, volume) et schémas nommés."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
 from btc_vol_research.config import CalibrationConfig
-from btc_vol_research.iv.black_scholes import bs_vega_vec
+from btc_vol_research.market.greeks import bs_vega_vec
 
 WeightFn = Callable[[pd.DataFrame, CalibrationConfig, float, float], np.ndarray]
 
@@ -62,6 +63,30 @@ def calibration_weights(
     return _normalize_weights(w)
 
 
+def calibration_weights_v2(
+    slice_df: pd.DataFrame,
+    cfg: CalibrationConfig,
+    r: float,
+    q: float,
+) -> np.ndarray:
+    """v2 : w_i ∝ vega × √(1+OI) × √(1+volume) (normalisées)."""
+    n = len(slice_df)
+    w = np.ones(n)
+
+    if cfg.use_vega_weight:
+        w *= np.maximum(_vega_vector(slice_df, r, q), 1e-8)
+
+    oi = (
+        slice_df["open_interest"].astype(float).fillna(0).values
+        if "open_interest" in slice_df.columns
+        else np.zeros(n)
+    )
+    vol = _volume_series(slice_df)
+    w *= np.sqrt(oi + 1.0) * np.sqrt(vol + 1.0)
+
+    return _normalize_weights(w)
+
+
 def vega_only_weights(
     slice_df: pd.DataFrame,
     cfg: CalibrationConfig,
@@ -102,25 +127,28 @@ def build_panel_weights(
     return w
 
 
-def calibration_weights_v2(
-    slice_df: pd.DataFrame,
-    cfg: CalibrationConfig,
-    r: float,
-    q: float,
-) -> np.ndarray:
-    """v2 : w_i ∝ vega × √(1+OI) × √(1+volume) (normalisées)."""
-    n = len(slice_df)
-    w = np.ones(n)
+# --- Schémas nommés (Merton global) -------------------------------------------------
 
-    if cfg.use_vega_weight:
-        w *= np.maximum(_vega_vector(slice_df, r, q), 1e-8)
 
-    oi = (
-        slice_df["open_interest"].astype(float).fillna(0).values
-        if "open_interest" in slice_df.columns
-        else np.zeros(n)
-    )
-    vol = _volume_series(slice_df)
-    w *= np.sqrt(oi + 1.0) * np.sqrt(vol + 1.0)
+@dataclass(frozen=True)
+class MertonWeightScheme:
+    scheme_id: str
+    label: str
+    weight_fn: WeightFn | None
 
-    return _normalize_weights(w)
+
+MERTON_WEIGHT_SCHEMES: tuple[MertonWeightScheme, ...] = (
+    MertonWeightScheme("uniform", "sans ponderation", None),
+    MertonWeightScheme("vega", "vega", vega_only_weights),
+    MertonWeightScheme("volume", "volume", volume_only_weights),
+)
+
+_SCHEME_BY_ID = {s.scheme_id: s for s in MERTON_WEIGHT_SCHEMES}
+
+
+def get_merton_weight_scheme(scheme_id: str) -> MertonWeightScheme:
+    key = scheme_id.strip().lower()
+    if key not in _SCHEME_BY_ID:
+        known = ", ".join(_SCHEME_BY_ID)
+        raise ValueError(f"Ponderation Merton inconnue: {scheme_id!r} (attendu: {known})")
+    return _SCHEME_BY_ID[key]

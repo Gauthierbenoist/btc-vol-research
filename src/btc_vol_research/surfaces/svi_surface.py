@@ -5,16 +5,19 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-from btc_vol_research.models.svi.calibrate import SVICalibrationResult
-from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness, svi_total_variance
-from btc_vol_research.surfaces.surface import grid_surface_to_long_dataframe
+from btc_vol_research.calibration.results import SliceCalibrationResult
+from btc_vol_research.models.svi import svi_iv_from_log_moneyness, svi_total_variance
 
 
-def _sorted_results(results: list[SVICalibrationResult]) -> list[SVICalibrationResult]:
+def _sorted_results(results: list[SliceCalibrationResult]) -> list[SliceCalibrationResult]:
     return sorted(results, key=lambda r: r.T)
 
 
-def _k_bounds(results: list[SVICalibrationResult], panel: pd.DataFrame | None, k_pad: float) -> tuple[float, float]:
+def _k_bounds(
+    results: list[SliceCalibrationResult],
+    panel: pd.DataFrame | None,
+    k_pad: float,
+) -> tuple[float, float]:
     if panel is not None and len(panel):
         lo = float(panel["log_moneyness"].min()) - k_pad
         hi = float(panel["log_moneyness"].max()) + k_pad
@@ -27,7 +30,7 @@ def _k_bounds(results: list[SVICalibrationResult], panel: pd.DataFrame | None, k
 def svi_iv_at_point(
     k: np.ndarray | float,
     T: float,
-    results: list[SVICalibrationResult],
+    results: list[SliceCalibrationResult],
     *,
     atol_T: float = 1e-8,
 ) -> np.ndarray:
@@ -61,7 +64,7 @@ def svi_iv_at_point(
 
 
 def build_svi_surface_grid(
-    results: list[SVICalibrationResult],
+    results: list[SliceCalibrationResult],
     panel: pd.DataFrame | None = None,
     *,
     n_moneyness: int = 50,
@@ -98,15 +101,3 @@ def build_svi_surface_grid(
             iv_matrix[i, :] = svi_iv_at_point(k_lin, float(T), ordered)
 
     return lm_grid, T_grid, iv_matrix
-
-
-def surface_to_long_dataframe(
-    lm_grid: np.ndarray,
-    T_grid: np.ndarray,
-    iv_matrix: np.ndarray,
-    snapshot_date: str,
-) -> pd.DataFrame:
-    """Format tabulaire pour export CSV."""
-    return grid_surface_to_long_dataframe(
-        lm_grid, T_grid, iv_matrix, snapshot_date, value_col="iv_svi"
-    )

@@ -11,7 +11,24 @@ ParamsT = TypeVar("ParamsT")
 
 
 @dataclass
+class SliceCalibrationResult(Generic[ParamsT]):
+    """Résultat d'une calibration par tranche de maturité (SVI, Heston)."""
+
+    slice_id: str
+    params: ParamsT
+    rmse_iv: float
+    market_iv: np.ndarray
+    model_iv: np.ndarray
+    log_moneyness: np.ndarray
+    T: float
+    success: bool
+    message: str
+
+
+@dataclass
 class SliceFitResult:
+    """Fit par maturité redécoupé à partir d'une calibration globale."""
+
     slice_id: str
     T: float
     rmse_iv: float
@@ -22,6 +39,8 @@ class SliceFitResult:
 
 @dataclass
 class GlobalCalibrationResult(Generic[ParamsT]):
+    """Résultat d'une calibration globale sur toute la surface (Merton)."""
+
     params: ParamsT
     rmse_iv: float
     slice_results: list[SliceFitResult]

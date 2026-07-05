@@ -10,8 +10,11 @@ import numpy as np
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from btc_vol_research.models.svi.params import SVIParams  # noqa: E402
-from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness, svi_total_variance  # noqa: E402
+from btc_vol_research.models.svi import (  # noqa: E402
+    SVIParams,
+    svi_iv_from_log_moneyness,
+    svi_total_variance,
+)
 
 
 def test_svi_positive_variance():
