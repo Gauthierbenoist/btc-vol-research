@@ -15,7 +15,6 @@ def svi_summary_table(results: list[SVICalibrationResult]) -> pd.DataFrame:
             {
                 "slice_id": r.slice_id,
                 "rmse_iv": r.rmse_iv,
-                "weighted_rmse_iv": r.weighted_rmse_iv,
                 "a": p.a,
                 "b": p.b,
                 "rho": p.rho,

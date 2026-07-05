@@ -153,7 +153,7 @@ def main() -> int:
 
     for r in results_plots:
         rmse = r.rmse_iv if np.isfinite(r.rmse_iv) else float("nan")
-        print(f"  {r.slice_id}: RMSE IV={rmse:.4f} (pondere {r.weighted_rmse_iv:.4f})")
+        print(f"  {r.slice_id}: RMSE IV={rmse:.4f}")
 
     print("\n--- SVI v1 (poids vega * sqrt(OI)) ---")
     _emit_svi_figures(
@@ -181,7 +181,7 @@ def main() -> int:
         print(f"  Rapport: {report_w2.name}")
         for r in results_plots_w2:
             rmse = r.rmse_iv if np.isfinite(r.rmse_iv) else float("nan")
-            print(f"  {r.slice_id}: RMSE IV={rmse:.4f} (pondere {r.weighted_rmse_iv:.4f})")
+            print(f"  {r.slice_id}: RMSE IV={rmse:.4f}")
         _emit_svi_figures(
             results_w2,
             results_plots_w2,

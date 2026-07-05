@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 
-from btc_vol_research.models.calibration.errors import iv_rmse, iv_weighted_rmse
+from btc_vol_research.models.calibration.errors import iv_rmse
 from btc_vol_research.models.calibration.results import SliceFitResult
 
 
@@ -33,7 +33,6 @@ def build_slice_fits(
                 slice_id=str(sid),
                 T=float(g["T"].iloc[0]),
                 rmse_iv=iv_rmse(mkt, mdl),
-                weighted_rmse_iv=iv_rmse(mkt, mdl) if w is None else iv_weighted_rmse(mkt, mdl, w),
                 market_iv=mkt,
                 model_iv=mdl,
                 log_moneyness=g["log_moneyness"].values.astype(float),

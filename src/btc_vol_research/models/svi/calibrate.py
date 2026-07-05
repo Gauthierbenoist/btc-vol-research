@@ -20,7 +20,6 @@ class SVICalibrationResult:
     slice_id: str
     params: SVIParams
     rmse_iv: float
-    weighted_rmse_iv: float
     market_iv: np.ndarray
     model_iv: np.ndarray
     log_moneyness: np.ndarray
@@ -97,13 +96,11 @@ def calibrate_slice(
     model_iv = svi_iv_from_log_moneyness(k, T, params_opt)
     err = model_iv - market_iv
     rmse = float(np.sqrt(np.mean(err**2)))
-    w_rmse = float(np.sqrt(np.mean(weights * err**2 / (weights.sum() + 1e-12))))
 
     return SVICalibrationResult(
         slice_id=sid,
         params=params_opt,
         rmse_iv=rmse,
-        weighted_rmse_iv=w_rmse,
         market_iv=market_iv,
         model_iv=model_iv,
         log_moneyness=k,

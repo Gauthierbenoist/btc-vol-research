@@ -1,4 +1,4 @@
-"""Métriques d'erreur IV communes."""
+"""Métriques d'erreur IV et prix communes."""
 
 from __future__ import annotations
 
@@ -29,11 +29,22 @@ def iv_error_variance(market_iv: np.ndarray, model_iv: np.ndarray) -> float:
     return float(np.var(err))
 
 
-def iv_weighted_rmse(
+def price_rmse(
     market_iv: np.ndarray,
     model_iv: np.ndarray,
-    weights: np.ndarray,
+    S: np.ndarray,
+    K: np.ndarray,
+    T: np.ndarray,
+    r: float,
+    q: float,
 ) -> float:
-    err2 = (np.asarray(model_iv) - np.asarray(market_iv)) ** 2
-    w = np.asarray(weights, dtype=float)
-    return float(np.sqrt(np.mean(w * err2 / (w.sum() + 1e-12))))
+    """RMSE entre les prix BS implicites (marché vs modèle), en USD.
+
+    Reflète l'erreur réelle en trading/hedging, indépendante des poids de calibration.
+    """
+    from btc_vol_research.iv.black_scholes import bs_call_price_vec
+
+    market_px = bs_call_price_vec(S, K, T, r, q, np.asarray(market_iv)) * S
+    model_px = bs_call_price_vec(S, K, T, r, q, np.asarray(model_iv)) * S
+    err = model_px - market_px
+    return float(np.sqrt(np.mean(err**2)))

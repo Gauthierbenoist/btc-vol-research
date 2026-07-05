@@ -63,7 +63,7 @@ def main() -> int:
             model_name="Heston",
             file_prefix="heston",
         )
-        print(f"  {r.slice_id}: RMSE IV={r.rmse_iv:.4f} (pondéré {r.weighted_rmse_iv:.4f})")
+        print(f"  {r.slice_id}: RMSE IV={r.rmse_iv:.4f}")
 
     return 0
 

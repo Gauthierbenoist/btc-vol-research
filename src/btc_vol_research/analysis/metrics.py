@@ -14,7 +14,6 @@ def calibration_summary_table(results: list[CalibrationResult]) -> pd.DataFrame:
             {
                 "slice_id": r.slice_id,
                 "rmse_iv": r.rmse_iv,
-                "weighted_rmse_iv": r.weighted_rmse_iv,
                 "v0": r.params.v0,
                 "kappa": r.params.kappa,
                 "theta": r.params.theta,

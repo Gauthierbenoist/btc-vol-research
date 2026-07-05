@@ -10,7 +10,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from btc_vol_research.config import AppConfig, HestonBounds
-from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse, iv_weighted_rmse
+from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse
 from btc_vol_research.models.calibration.filters import quality_filter
 from btc_vol_research.models.heston.params import HestonParams
 from btc_vol_research.models.heston.pricer import heston_iv_grid
@@ -107,15 +107,12 @@ def calibrate_slice(
         market.dividend_yield,
         slice_df["option_type"].values,
     )
-    err = model_iv - market_iv
     rmse = iv_rmse(market_iv, model_iv)
-    w_rmse = iv_weighted_rmse(market_iv, model_iv, weights)
 
     return CalibrationResult(
         slice_id=sid,
         params=params_opt,
         rmse_iv=rmse,
-        weighted_rmse_iv=w_rmse,
         market_iv=market_iv,
         model_iv=model_iv,
         strikes=strikes,

@@ -9,7 +9,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from btc_vol_research.config import AppConfig, MertonBounds
-from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse, iv_weighted_rmse
+from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse
 from btc_vol_research.models.calibration.filters import quality_filter
 from btc_vol_research.models.calibration.results import GlobalCalibrationResult
 from btc_vol_research.models.calibration.slice_fits import build_slice_fits
@@ -95,12 +95,10 @@ def calibrate_global(
     slice_results = build_slice_fits(fit_df, model_iv, weights=weights)
 
     rmse = iv_rmse(market_iv, model_iv)
-    w_rmse = iv_weighted_rmse(market_iv, model_iv, weights) if weights is not None else rmse
 
     return GlobalCalibrationResult(
         params=params_opt,
         rmse_iv=rmse,
-        weighted_rmse_iv=w_rmse,
         slice_results=slice_results,
         n_points=len(fit_df),
         success=bool(res.success),

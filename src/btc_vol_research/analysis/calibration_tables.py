@@ -14,7 +14,6 @@ def slice_fit_summary_table(slice_results: list[SliceFitResult]) -> pd.DataFrame
             "slice_id": s.slice_id,
             "T_years": s.T,
             "rmse_iv": s.rmse_iv,
-            "weighted_rmse_iv": s.weighted_rmse_iv,
             "n_strikes": len(s.market_iv),
         }
         for s in slice_results
@@ -30,7 +29,6 @@ def merton_global_summary_table(result: GlobalCalibrationResult[MertonParams]) -
                 "weight_scheme": result.weight_scheme,
                 "calibration_time_s": result.calibration_time_s,
                 "rmse_iv": result.rmse_iv,
-                "weighted_rmse_iv": result.weighted_rmse_iv,
                 "n_points": result.n_points,
                 "n_slices": len(result.slice_results),
                 "sigma": p.sigma,
