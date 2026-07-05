@@ -27,7 +27,6 @@ def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = 
         out["S"], out["T"], market.risk_free_rate, market.dividend_yield
     )
     out["log_moneyness"] = np.log(out["K"] / out["forward"])
-
     out["rel_spread"] = relative_spread(out["bid_price"], out["ask_price"], out["mid_price"])
     out["iv_used"] = out["mark_iv"].astype(float)
 
