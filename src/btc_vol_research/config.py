@@ -35,6 +35,8 @@ class MarketConfig:
     min_time_to_expiry_days: float = float(os.getenv("MIN_TIME_TO_EXPIRY_DAYS", "1"))
     max_time_to_expiry_years: float = float(os.getenv("MAX_TIME_TO_EXPIRY_YEARS", "1.0"))
     max_relative_spread: float = float(os.getenv("MAX_REL_SPREAD", "0.5"))
+    min_iv: float = float(os.getenv("MIN_IV", "0.05"))
+    max_iv: float = float(os.getenv("MAX_IV", "3.0"))
     smile_convention: str = "otm"
     drop_phantom_bid_ask: bool = _env_bool("DROP_PHANTOM_BID_ASK", True)
 
@@ -156,6 +158,8 @@ def load_config(path: Path | None = None) -> AppConfig:
         min_time_to_expiry_days=float(market_raw.get("min_time_to_expiry_days", 1)),
         max_time_to_expiry_years=float(market_raw.get("max_time_to_expiry_years", 1.0)),
         max_relative_spread=float(market_raw.get("max_relative_spread", 0.5)),
+        min_iv=float(market_raw.get("min_iv", os.getenv("MIN_IV", "0.05"))),
+        max_iv=float(market_raw.get("max_iv", os.getenv("MAX_IV", "3.0"))),
         smile_convention=str(market_raw.get("smile_convention", "otm")),
         drop_phantom_bid_ask=bool(market_raw.get("drop_phantom_bid_ask", True)),
     )

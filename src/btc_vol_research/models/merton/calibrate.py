@@ -9,7 +9,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from btc_vol_research.config import AppConfig, MertonBounds
-from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse
+from btc_vol_research.models.calibration.errors import iv_rmse, sse_objective
 from btc_vol_research.models.calibration.filters import quality_filter
 from btc_vol_research.models.calibration.results import GlobalCalibrationResult
 from btc_vol_research.models.calibration.slice_fits import build_slice_fits
@@ -44,11 +44,7 @@ def calibrate_global(
     market = cfg.market
     bounds = cfg.merton_bounds
 
-    fit_df = quality_filter(
-        panel,
-        min_strikes=calib.min_strikes_per_slice,
-        t_max_years=market.max_time_to_expiry_years,
-    ).reset_index(drop=True)
+    fit_df = quality_filter(panel, cfg, min_strikes=calib.min_strikes_per_slice).reset_index(drop=True)
     market_iv = fit_df["iv_used"].values.astype(float)
     weights = None
     if weight_fn is not None:
@@ -79,7 +75,7 @@ def calibrate_global(
             return penalty
         if np.any(~np.isfinite(model_iv)):
             return penalty
-        return iv_sse(market_iv, model_iv, weights=weights)
+        return sse_objective(market_iv, model_iv, weights=weights)
 
     t0 = time.perf_counter()
     res = minimize(objective, x0, method=calib.optimizer, bounds=bnds, options={"maxiter": 300})

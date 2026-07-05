@@ -10,7 +10,7 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from btc_vol_research.config import AppConfig, HestonBounds
-from btc_vol_research.models.calibration.errors import iv_rmse, iv_sse
+from btc_vol_research.models.calibration.errors import iv_rmse, sse_objective
 from btc_vol_research.models.calibration.filters import quality_filter
 from btc_vol_research.models.heston.params import HestonParams
 from btc_vol_research.models.heston.pricer import heston_iv_grid
@@ -22,7 +22,6 @@ class CalibrationResult:
     slice_id: str
     params: HestonParams
     rmse_iv: float
-    weighted_rmse_iv: float
     market_iv: np.ndarray
     model_iv: np.ndarray
     strikes: np.ndarray
@@ -58,11 +57,7 @@ def calibrate_slice(
     if len(slice_df) < calib.min_strikes_per_slice:
         raise ValueError(f"Slice {sid}: seulement {len(slice_df)} strikes (min {calib.min_strikes_per_slice})")
 
-    slice_df = quality_filter(
-        slice_df,
-        min_strikes=calib.min_strikes_per_slice,
-        t_max_years=market.max_time_to_expiry_years,
-    )
+    slice_df = quality_filter(slice_df, cfg, min_strikes=calib.min_strikes_per_slice)
 
     S0 = float(slice_df["S"].iloc[0])
     T = float(slice_df["T"].iloc[0])
@@ -92,8 +87,7 @@ def calibrate_slice(
             return calib.feller_penalty
         if np.any(~np.isfinite(model_iv)):
             return calib.feller_penalty
-        err = (model_iv - market_iv) ** 2
-        return iv_sse(market_iv, model_iv, weights)
+        return sse_objective(market_iv, model_iv, weights)
 
     res = minimize(objective, x0, method=calib.optimizer, bounds=bnds, options={"maxiter": 200})
 

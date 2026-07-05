@@ -42,7 +42,6 @@ def test_slice_iv_diagnostics_zones():
     mdl = mkt + np.array([0.02, 0.01, 0.0, 0.01, 0.03])
     diag = slice_iv_diagnostics(lm, mkt, mdl, atm_half_width=0.10)
     assert diag["rmse_uniform"] > 0
-    assert diag["mae_uniform"] > 0
     assert abs(diag["max_error_iv"] - 0.03) < 1e-12
     assert np.isfinite(diag["rmse_atm"])
     assert np.isfinite(diag["rmse_left_wing"])
@@ -83,4 +82,4 @@ def test_merton_global_calibration_vega_weighted():
     assert result.calibration_time_s >= 0
     assert result.n_points == len(panel)
     assert len(result.slice_results) == 2
-    assert np.isfinite(result.weighted_rmse_iv)
+    assert np.isfinite(result.rmse_iv)

@@ -289,11 +289,10 @@ def plot_merton_iv_and_abs_error_plotly(
     snapshot_date: str,
     *,
     rmse_pct: float,
-    err_var_pct2: float,
     file_stem: str = "merton",
     title_suffix: str = "",
 ) -> Path:
-    """IV modele + |erreur| cote a cote (Plotly) avec RMSE global et variance des ecarts."""
+    """IV modele + |erreur| cote a cote (Plotly) avec RMSE global."""
     from plotly.subplots import make_subplots
     import plotly.graph_objects as go
 
@@ -329,11 +328,7 @@ def plot_merton_iv_and_abs_error_plotly(
         row=1,
         col=2,
     )
-    metrics = (
-        f"RMSE global = {rmse_pct:.3f} pts vol | "
-        f"Var(epsilon) = {err_var_pct2:.3f} (pts vol)^2 | "
-        f"MSE = RMSE^2 = {rmse_pct**2:.3f}"
-    )
+    metrics = f"RMSE global = {rmse_pct:.3f} pts vol | MSE = RMSE^2 = {rmse_pct**2:.3f}"
     fig.update_layout(
         title={
             "text": (

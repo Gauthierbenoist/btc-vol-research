@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from btc_vol_research.analysis.zones import ZONE_ATM, ZONE_LEFT, ZONE_RIGHT, assign_moneyness_zone
-from btc_vol_research.models.calibration.errors import iv_mae, iv_rmse
+from btc_vol_research.models.calibration.errors import iv_rmse
 
 
 def _zone_rmse(
@@ -26,7 +26,7 @@ def slice_iv_diagnostics(
     model_iv: np.ndarray,
     atm_half_width: float,
 ) -> dict[str, float]:
-    """RMSE/MAE uniformes, RMSE par zone, erreur maximale (IV décimale)."""
+    """RMSE uniforme, RMSE par zone, erreur maximale (IV décimale)."""
     lm = np.asarray(log_moneyness, dtype=float)
     mkt = np.asarray(market_iv, dtype=float)
     mdl = np.asarray(model_iv, dtype=float)
@@ -35,7 +35,6 @@ def slice_iv_diagnostics(
 
     return {
         "rmse_uniform": iv_rmse(mkt, mdl),
-        "mae_uniform": iv_mae(mkt, mdl),
         "rmse_atm": _zone_rmse(mkt, mdl, zones, ZONE_ATM),
         "rmse_left_wing": _zone_rmse(mkt, mdl, zones, ZONE_LEFT),
         "rmse_right_wing": _zone_rmse(mkt, mdl, zones, ZONE_RIGHT),

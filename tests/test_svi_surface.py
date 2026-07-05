@@ -22,7 +22,6 @@ def _fake_result(T: float, a: float) -> SVICalibrationResult:
         slice_id=str(T),
         params=p,
         rmse_iv=0.01,
-        weighted_rmse_iv=0.01,
         market_iv=np.full(10, 0.5),
         model_iv=np.full(10, 0.5),
         log_moneyness=k,

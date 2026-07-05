@@ -78,7 +78,6 @@ def merton_slice_metrics_row(
         "n_strikes": len(sr.market_iv),
         "calibration_time_s": calibration_time_s,
         "rmse_uniform": diag["rmse_uniform"] * 100.0,
-        "mae_uniform": diag["mae_uniform"] * 100.0,
         "rmse_atm": diag["rmse_atm"] * 100.0,
         "rmse_left_wing": diag["rmse_left_wing"] * 100.0,
         "rmse_right_wing": diag["rmse_right_wing"] * 100.0,

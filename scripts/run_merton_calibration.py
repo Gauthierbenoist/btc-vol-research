@@ -19,7 +19,6 @@ from btc_vol_research.analysis.report import write_merton_calibration_report
 from btc_vol_research.config import load_config
 from btc_vol_research.data.loader import load_snapshot
 from btc_vol_research.data.panel import build_market_panel
-from btc_vol_research.models.calibration.errors import iv_error_variance
 from btc_vol_research.models.calibration.filters import quality_filter
 from btc_vol_research.models.calibration_weights import build_panel_weights
 from btc_vol_research.models.merton.calibrate import calibrate_global
@@ -116,7 +115,6 @@ def _generate_surfaces(
     _, _, err_grid = build_merton_abs_error_surface_grid(fit_df, model_iv)
 
     rmse_pct = result.rmse_iv * 100.0
-    err_var_pct2 = iv_error_variance(fit_df["iv_used"].values, model_iv) * 100.0**2
     file_stem = f"merton_{scheme_id}"
     title_suffix = f" ({scheme_label})"
 
@@ -137,7 +135,6 @@ def _generate_surfaces(
         fig_dir,
         snap_str,
         rmse_pct=rmse_pct,
-        err_var_pct2=err_var_pct2,
         file_stem=file_stem,
         title_suffix=title_suffix,
     )
@@ -148,7 +145,7 @@ def _generate_surfaces(
 
     print(f"  Surface 3D: {surface_html.name}")
     print(f"  IV + erreur absolue: {dual_html.name}")
-    print(f"  RMSE global: {rmse_pct:.3f} pts vol | Var(epsilon): {err_var_pct2:.3f} (pts vol)^2")
+    print(f"  RMSE global: {rmse_pct:.3f} pts vol")
     print(f"  Temps calibration: {result.calibration_time_s:.2f} s")
 
 
@@ -178,11 +175,7 @@ def main() -> int:
     snapshot_date = raw["snapshot_date"].iloc[0]
     snap_str = str(snapshot_date)
     panel = build_market_panel(raw, cfg)
-    fit_df = quality_filter(
-        panel,
-        min_strikes=cfg.calibration.min_strikes_per_slice,
-        t_max_years=cfg.market.max_time_to_expiry_years,
-    ).reset_index(drop=True)
+    fit_df = quality_filter(panel, cfg, min_strikes=cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
     atm_w = cfg.calibration.atm_zone_half_width
     r = cfg.market.risk_free_rate
     q = cfg.market.dividend_yield
@@ -247,7 +240,7 @@ def main() -> int:
 
     print(f"\nCSV metriques par maturite: {metrics_path.name}")
     preview = full_metrics.loc[full_metrics["weight_scheme"] == scheme.scheme_id][
-        ["weight_scheme", "slice_id", "rmse_uniform", "mae_uniform", "rmse_atm", "calibration_time_s"]
+        ["weight_scheme", "slice_id", "rmse_uniform", "rmse_atm", "calibration_time_s"]
     ]
     print("\n=== Metriques (RMSE uniforme, pts vol) ===")
     print(preview.to_string(index=False))
