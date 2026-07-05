@@ -18,15 +18,12 @@ from btc_vol_research.models.svi.calibrate import SVICalibrationResult, calibrat
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness
 from btc_vol_research.surfaces.plots import (
     plot_calibration_fit,
-    plot_mark_vs_mid,
     plot_svi_rmse_by_zone,
     plot_svi_rmse_zones_heatmap,
     plot_svi_rho_term_structure,
     plot_svi_surface,
 )
 from btc_vol_research.analysis.iv_diagnostics import (
-    mark_vs_mid_summary,
-    mark_vs_mid_table,
     svi_rmse_by_zone,
 )
 from btc_vol_research.analysis.svi_metrics import svi_summary_table, svi_term_structure_table
@@ -140,18 +137,11 @@ def main() -> int:
     print(f"\nRapport: {report_path}")
 
     atm_w = cfg.calibration.atm_zone_half_width
-    mark_mid = mark_vs_mid_table(panel, atm_w)
-    mark_mid_sum = mark_vs_mid_summary(panel, atm_w)
     svi_zones = svi_rmse_by_zone(results_all, atm_w)
     diag_dir = cfg.reports_dir
-    mark_mid.to_csv(diag_dir / f"mark_vs_mid_by_zone_{snap_str}.csv", index=False)
-    mark_mid_sum.to_csv(diag_dir / f"mark_vs_mid_summary_{snap_str}.csv", index=False)
     svi_zones.to_csv(diag_dir / f"svi_rmse_by_zone_{snap_str}.csv", index=False)
-    plot_mark_vs_mid(panel, fig_dir, snap_str, atm_w)
     plot_svi_rmse_by_zone(svi_zones, fig_dir, snap_str)
     plot_svi_rmse_zones_heatmap(svi_zones, fig_dir, snap_str)
-    print("\n=== mark_iv vs iv_mid (moyenne par zone) ===")
-    print(mark_mid_sum.to_string(index=False))
     print("\n=== RMSE SVI par zone (moyenne sur maturites) ===")
     print(
         svi_zones.groupby("zone")[["rmse_svi", "bias_model_minus_mkt"]]
@@ -159,7 +149,7 @@ def main() -> int:
         .assign(rmse_svi_pct=lambda d: d["rmse_svi"] * 100)
         .to_string()
     )
-    print(f"\nDiagnostics : mark_vs_mid_{snap_str}.png, svi_rmse_by_zone_{snap_str}.png")
+    print(f"\nDiagnostics : svi_rmse_by_zone_{snap_str}.png")
 
     for r in results_plots:
         rmse = r.rmse_iv if np.isfinite(r.rmse_iv) else float("nan")

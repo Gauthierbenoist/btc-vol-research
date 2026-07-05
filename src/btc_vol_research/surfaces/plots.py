@@ -352,62 +352,6 @@ def plot_merton_iv_and_abs_error_plotly(
     return path
 
 
-def plot_mark_vs_mid(
-    panel: pd.DataFrame,
-    out_dir: Path,
-    snapshot_date: str,
-    atm_half_width: float = 0.10,
-) -> Path:
-    """mark_iv vs iv_mid (scatter + écart) coloré par zone."""
-    from btc_vol_research.analysis.zones import ZONE_ATM, ZONE_LEFT, ZONE_RIGHT, assign_moneyness_zone, zone_label_fr
-
-    out_dir.mkdir(parents=True, exist_ok=True)
-    lm = panel["log_moneyness"].values
-    zones = assign_moneyness_zone(lm, atm_half_width)
-    mark = panel["iv_mark"].values * 100
-    mid = panel["iv_mid"].values * 100
-    colors = {ZONE_LEFT: "C0", ZONE_ATM: "C2", ZONE_RIGHT: "C3"}
-
-    fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-
-    ax = axes[0]
-    for z in (ZONE_LEFT, ZONE_ATM, ZONE_RIGHT):
-        m = zones == z
-        if m.sum() == 0:
-            continue
-        ax.scatter(mark[m], mid[m], s=14, alpha=0.55, c=colors[z], label=zone_label_fr(z))
-    lim_lo = min(np.nanmin(mark), np.nanmin(mid))
-    lim_hi = max(np.nanmax(mark), np.nanmax(mid))
-    ax.plot([lim_lo, lim_hi], [lim_lo, lim_hi], "k--", lw=0.8, label="mark = mid")
-    ax.set_xlabel("mark_iv (%)")
-    ax.set_ylabel("iv_mid inversion BS (%)")
-    ax.set_title(f"mark_iv vs iv_mid — {snapshot_date}")
-    ax.legend(fontsize=8)
-    ax.grid(True, alpha=0.3)
-
-    ax2 = axes[1]
-    diff = mark - mid
-    for z in (ZONE_LEFT, ZONE_ATM, ZONE_RIGHT):
-        m = zones == z
-        if m.sum() == 0:
-            continue
-        ax2.scatter(lm[m], diff[m], s=14, alpha=0.55, c=colors[z], label=zone_label_fr(z))
-    ax2.axhline(0, color="k", lw=0.8)
-    ax2.axvline(-atm_half_width, color="gray", ls=":", lw=0.7)
-    ax2.axvline(atm_half_width, color="gray", ls=":", lw=0.7)
-    ax2.set_xlabel("log(K/F)")
-    ax2.set_ylabel("mark_iv − iv_mid (pts vol)")
-    ax2.set_title("Écart mark − mid par moneyness")
-    ax2.legend(fontsize=8)
-    ax2.grid(True, alpha=0.3)
-
-    path = out_dir / f"mark_vs_mid_{snapshot_date}.png"
-    fig.tight_layout()
-    fig.savefig(path, dpi=120)
-    plt.close(fig)
-    return path
-
-
 def plot_svi_rmse_by_zone(
     rmse_df: pd.DataFrame,
     out_dir: Path,
