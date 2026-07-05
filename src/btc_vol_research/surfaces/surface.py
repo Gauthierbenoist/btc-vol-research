@@ -29,3 +29,28 @@ def build_iv_surface_grid(
     points = np.column_stack([lm, T])
     iv_matrix = griddata(points, iv, (lm_grid, T_grid), method="linear")
     return lm_grid, T_grid, iv_matrix
+
+
+def grid_surface_to_long_dataframe(
+    lm_grid: np.ndarray,
+    t_grid: np.ndarray,
+    value_matrix: np.ndarray,
+    snapshot_date: str,
+    *,
+    value_col: str,
+) -> pd.DataFrame:
+    """Grille 2D (log-moneyness, T) -> DataFrame long (points finis uniquement)."""
+    lm = np.asarray(lm_grid, dtype=float).ravel()
+    t = np.asarray(t_grid, dtype=float).ravel()
+    values = np.asarray(value_matrix, dtype=float).ravel()
+    mask = np.isfinite(values)
+    if not np.any(mask):
+        return pd.DataFrame(columns=["snapshot_date", "log_moneyness", "T_years", value_col])
+    return pd.DataFrame(
+        {
+            "snapshot_date": snapshot_date,
+            "log_moneyness": lm[mask],
+            "T_years": t[mask],
+            value_col: values[mask],
+        }
+    )

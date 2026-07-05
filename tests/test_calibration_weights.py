@@ -4,7 +4,11 @@ import numpy as np
 import pandas as pd
 
 from btc_vol_research.config import CalibrationConfig
-from btc_vol_research.models.calibration_weights import calibration_weights, calibration_weights_v2
+from btc_vol_research.models.calibration_weights import (
+    _vega_vector,
+    calibration_weights,
+    calibration_weights_v2,
+)
 
 
 def _slice_df() -> pd.DataFrame:
@@ -18,6 +22,20 @@ def _slice_df() -> pd.DataFrame:
             "volume_24h": [0.0, 15.0],
         }
     )
+
+
+def test_vega_vector_matches_scalar_bs_vega():
+    from btc_vol_research.iv.black_scholes import bs_vega
+
+    df = _slice_df()
+    vec = _vega_vector(df, 0.0, 0.0)
+    expected = np.array(
+        [
+            bs_vega(float(row.S), float(row.K), float(row.T), 0.0, 0.0, float(row.iv_used))
+            for row in df.itertuples()
+        ]
+    )
+    assert np.allclose(vec, expected)
 
 
 def test_calibration_weights_v2_uses_one_plus_oi_and_volume():

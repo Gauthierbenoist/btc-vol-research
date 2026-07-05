@@ -37,3 +37,18 @@ def test_build_svi_surface_grid():
     lm, T, iv = build_svi_surface_grid([r1, r2], n_moneyness=20, n_maturities=10)
     assert lm.shape == iv.shape == T.shape
     assert np.all(np.isfinite(iv))
+
+
+def test_grid_surface_to_long_dataframe():
+    from btc_vol_research.surfaces.surface import grid_surface_to_long_dataframe
+    from btc_vol_research.surfaces.svi_surface import surface_to_long_dataframe
+
+    lm = np.array([[-1.0, 0.0], [1.0, np.nan]])
+    t = np.array([[0.1, 0.1], [0.5, 0.5]])
+    iv = np.array([[0.4, 0.5], [0.6, np.nan]])
+
+    direct = grid_surface_to_long_dataframe(lm, t, iv, "2026-06-01", value_col="iv_svi")
+    wrapped = surface_to_long_dataframe(lm, t, iv, "2026-06-01")
+    assert len(direct) == 3
+    assert direct.equals(wrapped)
+    assert np.allclose(direct["iv_svi"].values, [0.4, 0.5, 0.6])

@@ -7,6 +7,7 @@ import pandas as pd
 
 from btc_vol_research.models.svi.calibrate import SVICalibrationResult
 from btc_vol_research.models.svi.formula import svi_iv_from_log_moneyness, svi_total_variance
+from btc_vol_research.surfaces.surface import grid_surface_to_long_dataframe
 
 
 def _sorted_results(results: list[SVICalibrationResult]) -> list[SVICalibrationResult]:
@@ -106,18 +107,6 @@ def surface_to_long_dataframe(
     snapshot_date: str,
 ) -> pd.DataFrame:
     """Format tabulaire pour export CSV."""
-    rows = []
-    for i in range(lm_grid.shape[0]):
-        for j in range(lm_grid.shape[1]):
-            iv = iv_matrix[i, j]
-            if not np.isfinite(iv):
-                continue
-            rows.append(
-                {
-                    "snapshot_date": snapshot_date,
-                    "log_moneyness": float(lm_grid[i, j]),
-                    "T_years": float(T_grid[i, j]),
-                    "iv_svi": float(iv),
-                }
-            )
-    return pd.DataFrame(rows)
+    return grid_surface_to_long_dataframe(
+        lm_grid, T_grid, iv_matrix, snapshot_date, value_col="iv_svi"
+    )

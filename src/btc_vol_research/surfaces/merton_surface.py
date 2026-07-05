@@ -7,6 +7,7 @@ import pandas as pd
 
 from btc_vol_research.models.merton.params import MertonParams
 from btc_vol_research.models.merton.pricer import merton_iv_panel
+from btc_vol_research.surfaces.surface import grid_surface_to_long_dataframe
 
 
 def build_merton_surface_grid(
@@ -59,21 +60,9 @@ def surface_to_long_dataframe(
     iv_matrix: np.ndarray,
     snapshot_date: str,
 ) -> pd.DataFrame:
-    rows = []
-    for i in range(lm_grid.shape[0]):
-        for j in range(lm_grid.shape[1]):
-            iv = iv_matrix[i, j]
-            if not np.isfinite(iv):
-                continue
-            rows.append(
-                {
-                    "snapshot_date": snapshot_date,
-                    "log_moneyness": float(lm_grid[i, j]),
-                    "T_years": float(t_grid[i, j]),
-                    "iv_merton": float(iv),
-                }
-            )
-    return pd.DataFrame(rows)
+    return grid_surface_to_long_dataframe(
+        lm_grid, t_grid, iv_matrix, snapshot_date, value_col="iv_merton"
+    )
 
 
 def build_merton_abs_error_surface_grid(
@@ -120,18 +109,6 @@ def abs_error_surface_to_long_dataframe(
     err_matrix: np.ndarray,
     snapshot_date: str,
 ) -> pd.DataFrame:
-    rows = []
-    for i in range(lm_grid.shape[0]):
-        for j in range(lm_grid.shape[1]):
-            err = err_matrix[i, j]
-            if not np.isfinite(err):
-                continue
-            rows.append(
-                {
-                    "snapshot_date": snapshot_date,
-                    "log_moneyness": float(lm_grid[i, j]),
-                    "T_years": float(t_grid[i, j]),
-                    "abs_error_iv_pts": float(err),
-                }
-            )
-    return pd.DataFrame(rows)
+    return grid_surface_to_long_dataframe(
+        lm_grid, t_grid, err_matrix, snapshot_date, value_col="abs_error_iv_pts"
+    )

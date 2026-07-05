@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 
 from btc_vol_research.config import CalibrationConfig
-from btc_vol_research.iv.black_scholes import bs_vega
+from btc_vol_research.iv.black_scholes import bs_vega_vec
 
 WeightFn = Callable[[pd.DataFrame, CalibrationConfig, float, float], np.ndarray]
 
@@ -19,13 +19,18 @@ def _normalize_weights(w: np.ndarray) -> np.ndarray:
 
 
 def _vega_vector(slice_df: pd.DataFrame, r: float, q: float) -> np.ndarray:
-    S0 = float(slice_df["S"].iloc[0])
-    T = float(slice_df["T"].iloc[0])
-    return np.array(
-        [
-            bs_vega(S0, float(row.K), T, r, q, float(row.iv_used))
-            for row in slice_df.itertuples()
-        ]
+    n = len(slice_df)
+    s0 = float(slice_df["S"].iloc[0])
+    t = float(slice_df["T"].iloc[0])
+    k = slice_df["K"].values.astype(float)
+    sigma = slice_df["iv_used"].values.astype(float)
+    return bs_vega_vec(
+        np.full(n, s0),
+        k,
+        np.full(n, t),
+        r,
+        q,
+        sigma,
     )
 
 
