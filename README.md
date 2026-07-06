@@ -2,87 +2,89 @@
 
 Recherche quantitative sur la **volatilité implicite** des options BTC (Deribit), à partir de la base **Neon** alimentée par le repo [Projet_Option_BTC](https://github.com/Gauthierbenoist/Projet_Option_BTC).
 
-## Pipeline recommandé
-
-1. **Smiles marché** — `run_smile_analysis.py`
-2. **Baseline SVI** — `run_svi_calibration.py` (paramétrisation Gatheral, rapide)
-3. **Heston** — `run_heston_calibration.py` (modèle stochastique, plus lourd)
-4. **Merton** — `run_merton_calibration.py` (sauts, calibration **globale** sur toute la surface)
-4. **Comparaison** — `run_compare_models.py` (RMSE SVI vs Heston)
+Trois modèles de smile/surface calibrés sur les mêmes données marché : **SVI** (baseline), **Heston** (volatilité stochastique) et **Merton** (jump-diffusion, calibration globale).
 
 ## Prérequis
 
 ```bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -r requirements.txt
-cp .env.example .env     # DATABASE_URL Neon
+pip install -e .              # ou : pip install -r requirements.txt
+cp .env.example .env          # renseigner DATABASE_URL (Neon)
 ```
 
 ## Utilisation
 
 ```bash
-python scripts/run_smile_analysis.py --list-dates
-python scripts/run_smile_analysis.py --date 2026-06-01
-
-# Baseline (à lancer en premier)
+# Baseline SVI (rapide, à lancer en premier)
 python scripts/run_svi_calibration.py --date 2026-06-01
-# rho(T) + surface : toutes les maturités éligibles ; --max-slices limite seulement les PNG smile
 
-# Modèle stochastique
-python scripts/run_merton_calibration.py --date 2026-06-01
+# Merton — jump-diffusion, calibration globale sur toute la surface
+python scripts/run_merton_calibration.py --date 2026-06-01 --weight-scheme vega
 
-# Tableau comparatif
-python scripts/run_compare_models.py --date 2026-06-01 --max-slices 4
+# Heston — volatilité stochastique (QuantLib, plus lourd)
+python scripts/run_heston_calibration.py --date 2026-06-01
 ```
 
-**Sorties** : `outputs/figures/` (`svi_fit_*.png`, `heston_fit_*.png`), `outputs/reports/` (`svi_calibration_*.csv`, …).
+Sans `--date`, le snapshot le plus récent de Neon est utilisé (ou `snapshot_date` de `configs/default.yaml`).
 
-## SVI (baseline)
+**Sorties** : `outputs/figures/` (fits PNG, surfaces 3D Plotly HTML) et `outputs/reports/` (CSV de calibration et de métriques).
 
-Variance totale :  
-`w(k) = a + b ( ρ(k−m) + √((k−m)² + σ²) )`  
-avec `k = ln(K/F)`, `σ_IV = √(w/T)`.
+## Modèles
 
-- Calibration par maturité, même **pondération v1** que Heston (`calibration_weights`)
-- Contrainte **no butterfly** (condition suffisante Gatheral)
-- Courbe lisse tracée sur une grille fine de `k`
-- **Surface 3D + contour** : interpolation de `w(k)` entre tenors (`svi_surface_3d_*.png`, `svi_surface_contour_*.png`, CSV grille)
-- **Structure terme du skew** : `ρ(T)` (`svi_rho_term_*.png`, `svi_rho_term_*.csv`)
+### SVI (baseline, Gatheral)
+
+Variance totale : `w(k) = a + b ( ρ(k−m) + √((k−m)² + σ²) )` avec `k = ln(K/F)`, `σ_IV = √(w/T)`.
+
+- Calibration **par maturité**, contrainte **no-butterfly** (condition suffisante Gatheral)
+- **Surface 3D + contour** : interpolation de `w(k)` entre tenors
+- **Structure par terme du skew** : `ρ(T)`
+- Génère aussi les figures avec la **pondération v2** (`svi_v2_*`)
+
+### Merton (jump-diffusion, 1976)
+
+Sauts log-normaux, un **seul jeu de paramètres** `(σ, λ, μ_J, σ_J)` sur toute la surface (calibration globale). Prix par série de Poisson × Black-Scholes. `--weight-scheme` : `uniform | vega | volume`.
+
+### Heston (volatilité stochastique)
+
+Pricing analytique via **QuantLib**, calibration **par maturité**, contrainte de **Feller** pénalisée.
 
 ## Structure
 
 ```
 src/btc_vol_research/
-  models/svi/       # baseline smile
-  models/merton/    # jump-diffusion, calibration globale
-  models/calibration/  # filtres, erreurs, decoupage par maturite
-  models/heston/    # QuantLib + calibration
-  models/calibration_weights.py
-  surfaces/         # plots
+  config.py            # config (YAML + env), dataclasses figées
+  data/                # loader (Neon), panel marché, filtres qualité + OTM
+  market/              # maths marché : forward, implied_vol (inversion BS), greeks
+  models/              # pricing pur : black_scholes, svi, merton, heston
+  calibration/         # errors, filters, weights, results, slices + svi/heston/merton
+  surfaces/            # svi_surface, merton_surface, export CSV, plots
+  analysis/            # tables récap, diagnostics Merton, rapports CSV
 scripts/
   run_svi_calibration.py
   run_merton_calibration.py
   run_heston_calibration.py
-  run_compare_models.py
 ```
 
-## Calibration (défauts communs)
+Chaque couche a une responsabilité unique : `data` prépare, `market`/`models` calculent, `calibration` optimise, `surfaces`/`analysis` restituent.
+
+## Choix de calibration (défauts)
 
 | Élément | Choix |
-|---------|--------|
-| Smile | Options **OTM** |
-| IV | `mark_iv` si mid incohérent, sinon inversion BS |
+|---------|-------|
+| Smile | Options **OTM** systématiquement (calls K>F, puts K<F) — liquidité |
+| IV source | `mark_iv` Deribit (`iv_used`) |
+| Objectif | `Σ wᵢ (σ_model − σ_mkt)²` (fonction de coût `sse_objective`) |
 | Poids v1 (défaut SVI/Heston) | `vega × √OI` — `calibration_weights()` |
 | Poids v2 | `vega × √(1+OI) × √(1+volume)` — `calibration_weights_v2()` |
-| Comparer v1 vs v2 (CSV) | `python scripts/compare_weight_schemes.py --date YYYY-MM-DD` |
-| Figures SVI v2 | generees par `run_svi_calibration.py` (`svi_v2_fit_*`, `svi_surface_v2_*`) |
-| Objectif | `Σ w_i (σ_model − σ_mkt)²` |
+| Filtres qualité | bornes IV/maturité/spread depuis la config (source unique) |
 
-Paramètres : `configs/default.yaml` (`svi:` et `heston:`).
+Tous les paramètres (bornes des modèles, filtres marché, poids) sont dans `configs/default.yaml`.
 
 ## Tests
 
 ```bash
 pytest tests/ -q
 ```
+
+> `test_heston.py` nécessite **QuantLib** ; les autres tests s'exécutent sans cette dépendance.
