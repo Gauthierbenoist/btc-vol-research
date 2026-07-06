@@ -13,8 +13,8 @@ import pandas as pd
 from btc_vol_research.analysis.merton_diagnostics import merton_slice_metrics_table
 from btc_vol_research.analysis.report import write_merton_calibration_report
 from btc_vol_research.analysis.tables import merton_global_summary_table, slice_fit_summary_table
-from btc_vol_research.calibration.filters import quality_filter
 from btc_vol_research.calibration.merton import calibrate_global
+from btc_vol_research.calibration.slices import require_min_points
 from btc_vol_research.calibration.weights import build_panel_weights, get_merton_weight_scheme
 from btc_vol_research.config import load_config
 from btc_vol_research.data.loader import load_snapshot
@@ -166,7 +166,7 @@ def main() -> int:
     snapshot_date = raw["snapshot_date"].iloc[0]
     snap_str = str(snapshot_date)
     panel = build_market_panel(raw, cfg)
-    fit_df = quality_filter(panel, cfg, min_strikes=cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
+    fit_df = require_min_points(panel, cfg.calibration.min_strikes_per_slice).reset_index(drop=True)
     r = cfg.market.risk_free_rate
     q = cfg.market.dividend_yield
     metrics_path = cfg.reports_dir / f"merton_slice_metrics_{snap_str}.csv"
@@ -174,7 +174,7 @@ def main() -> int:
     print(f"Snapshot {snapshot_date} — Merton scheme={scheme.scheme_id} ({scheme.label})")
 
     result = calibrate_global(
-        panel,
+        fit_df,
         cfg,
         weight_fn=scheme.weight_fn,
         weight_scheme=scheme.scheme_id,

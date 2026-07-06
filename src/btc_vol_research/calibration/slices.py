@@ -17,6 +17,18 @@ def atm_row(df: pd.DataFrame) -> pd.Series:
     return df.loc[df["log_moneyness"].abs().idxmin()]
 
 
+def require_min_points(df: pd.DataFrame, min_points: int, label: str = "") -> pd.DataFrame:
+    """Garde-fou : le panel/tranche arrive déjà filtré par build_market_panel().
+
+    On ne re-filtre plus rien ici (une seule source de vérité, côté data/) — on
+    vérifie juste qu'il reste assez de points pour lancer l'optimiseur.
+    """
+    if len(df) < min_points:
+        where = f" {label}" if label else ""
+        raise ValueError(f"Pas assez de points{where} ({len(df)} < {min_points})")
+    return df
+
+
 def calibrate_all_slices(
     panel: pd.DataFrame,
     cfg: AppConfig,

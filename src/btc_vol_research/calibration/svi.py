@@ -6,9 +6,8 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
-from btc_vol_research.calibration.filters import quality_filter
 from btc_vol_research.calibration.results import SliceCalibrationResult
-from btc_vol_research.calibration.slices import atm_row
+from btc_vol_research.calibration.slices import atm_row, require_min_points
 from btc_vol_research.calibration.slices import calibrate_all_slices as _run_all_slices
 from btc_vol_research.calibration.weights import WeightFn, calibration_weights
 from btc_vol_research.config import AppConfig, SVIBounds
@@ -41,7 +40,7 @@ def calibrate_slice(
     market = cfg.market
     bounds = cfg.svi_bounds
     sid = slice_id or str(slice_df["slice_id"].iloc[0])
-    slice_df = quality_filter(slice_df, cfg, min_strikes=calib.min_strikes_per_slice)
+    slice_df = require_min_points(slice_df, calib.min_strikes_per_slice, sid)
 
     T = float(slice_df["T"].iloc[0])
     k = slice_df["log_moneyness"].values.astype(float)

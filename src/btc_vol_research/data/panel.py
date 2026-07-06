@@ -34,7 +34,7 @@ def build_market_panel(df: pd.DataFrame, cfg: AppConfig | MarketConfig | None = 
         (out["T"] >= market.min_time_to_expiry_days / 365.25)
         & (out["T"] <= market.max_time_to_expiry_years)
         & (out["open_interest"] >= market.min_open_interest)
-        & (out["iv_used"] > 0)
+        & (out["iv_used"].between(market.min_iv, market.max_iv))
         & (out["rel_spread"].isna() | (out["rel_spread"] <= market.max_relative_spread))
     )
     if market.drop_phantom_bid_ask:

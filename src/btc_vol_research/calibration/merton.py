@@ -9,9 +9,8 @@ import pandas as pd
 from scipy.optimize import minimize
 
 from btc_vol_research.calibration.errors import iv_rmse, sse_objective
-from btc_vol_research.calibration.filters import quality_filter
 from btc_vol_research.calibration.results import GlobalCalibrationResult
-from btc_vol_research.calibration.slices import atm_row, build_slice_fits
+from btc_vol_research.calibration.slices import atm_row, build_slice_fits, require_min_points
 from btc_vol_research.calibration.weights import WeightFn, build_panel_weights
 from btc_vol_research.config import AppConfig, MertonBounds
 from btc_vol_research.models.merton import MertonParams, merton_iv_panel
@@ -28,7 +27,7 @@ def _initial_guess(panel: pd.DataFrame, bounds: MertonBounds) -> MertonParams:
 
 
 def calibrate_global(
-    panel: pd.DataFrame,
+    fit_df: pd.DataFrame,
     cfg: AppConfig,
     *,
     weight_fn: WeightFn | None = None,
@@ -37,12 +36,15 @@ def calibrate_global(
     """
     Un seul jeu de paramètres Merton sur toutes les maturités/strikes.
     Objectif : somme des w_i (sigma_model - sigma_mkt)^2 (w_i = 1 si uniforme).
+
+    `fit_df` est déjà filtré (build_market_panel()) — même donnée que celle
+    utilisée pour les plots, aucun re-filtrage ici.
     """
     calib = cfg.calibration
     market = cfg.market
     bounds = cfg.merton_bounds
 
-    fit_df = quality_filter(panel, cfg, min_strikes=calib.min_strikes_per_slice).reset_index(drop=True)
+    fit_df = require_min_points(fit_df, calib.min_strikes_per_slice)
     market_iv = fit_df["iv_used"].values.astype(float)
     weights = None
     if weight_fn is not None:
