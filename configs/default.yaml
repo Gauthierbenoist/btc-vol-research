@@ -9,7 +9,7 @@ market:
   max_time_to_expiry_years: 1.0
   max_relative_spread: 0.5
   min_iv: 0.05   # borne basse IV acceptee (calibration + panel)
-  max_iv: 3.0    # borne haute IV acceptee (calibration + panel)
+  max_iv: 4.0    # borne haute IV acceptee (calibration + panel) — marche BTC court terme peut depasser 300%
   drop_phantom_bid_ask: true  # options fantomes : exclure si bid NaN ou ask NaN
 
 calibration:
