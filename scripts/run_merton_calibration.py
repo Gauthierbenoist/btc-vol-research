@@ -26,8 +26,6 @@ from btc_vol_research.surfaces.merton_surface import (
     build_merton_surface_grid,
 )
 from btc_vol_research.surfaces.plots import (
-    MERTON_IV_PCT_LIM,
-    MERTON_LOG_MONEYNESS_LIM,
     plot_calibration_fit,
     plot_merton_iv_and_abs_error_plotly,
     plot_merton_surface_plotly,
@@ -84,8 +82,6 @@ def _plot_slices(
             sr.slice_id,
             model_name=f"Merton ({scheme_label})",
             file_prefix=file_prefix,
-            xlim=MERTON_LOG_MONEYNESS_LIM,
-            ylim=MERTON_IV_PCT_LIM,
         )
         print(f"  {sr.slice_id}: RMSE IV={sr.rmse_iv:.4f}")
     return len(plot_slices)

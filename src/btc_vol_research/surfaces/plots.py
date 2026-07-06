@@ -13,20 +13,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from btc_vol_research.calibration.results import SliceCalibrationResult
 
-# Echelles fixes des figures Merton (log-moneyness, IV en %).
-MERTON_LOG_MONEYNESS_LIM = (-1.5, 1.8)
-MERTON_IV_PCT_LIM = (30.0, 145.0)
-
-
-def _merton_plotly_scene(*, z_title: str, z_range: tuple[float, float] | None = None) -> dict:
-    scene: dict = {
-        "xaxis": {"title": "log(K/F)", "range": list(MERTON_LOG_MONEYNESS_LIM)},
+def _merton_plotly_scene(*, z_title: str) -> dict:
+    """Échelles automatiques (Plotly auto-range sur les données de chaque snapshot)."""
+    return {
+        "xaxis": {"title": "log(K/F)"},
         "yaxis_title": "T (années)",
         "zaxis": {"title": z_title},
     }
-    if z_range is not None:
-        scene["zaxis"]["range"] = list(z_range)
-    return scene
 
 
 def plot_svi_surface(
@@ -145,8 +138,6 @@ def plot_calibration_fit(
     model_name: str = "Heston",
     file_prefix: str | None = None,
     smooth_curve: tuple[np.ndarray, np.ndarray] | None = None,
-    xlim: tuple[float, float] | None = None,
-    ylim: tuple[float, float] | None = None,
 ) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     prefix = file_prefix or model_name.lower()
@@ -163,10 +154,6 @@ def plot_calibration_fit(
     ax.set_xlabel("log(K/F)")
     ax.set_ylabel("IV (%)")
     ax.set_title(f"Calibration {model_name} — {snapshot_date} — {slice_id}")
-    if xlim is not None:
-        ax.set_xlim(xlim)
-    if ylim is not None:
-        ax.set_ylim(ylim)
     ax.legend()
     ax.grid(True, alpha=0.3)
     path = out_dir / f"{prefix}_fit_{snapshot_date}_{slice_id}.png"
@@ -203,7 +190,7 @@ def plot_merton_surface_plotly(
     )
     fig.update_layout(
         title=f"Surface Merton{title_suffix} — {snapshot_date}",
-        scene=_merton_plotly_scene(z_title="IV (%)", z_range=MERTON_IV_PCT_LIM),
+        scene=_merton_plotly_scene(z_title="IV (%)"),
         margin={"l": 0, "r": 0, "b": 0, "t": 50},
     )
     path = out_dir / f"{file_stem}_surface_3d_{snapshot_date}.html"
@@ -270,7 +257,7 @@ def plot_merton_iv_and_abs_error_plotly(
             "xanchor": "center",
         },
         margin={"l": 0, "r": 0, "b": 0, "t": 90},
-        scene=_merton_plotly_scene(z_title="IV (%)", z_range=MERTON_IV_PCT_LIM),
+        scene=_merton_plotly_scene(z_title="IV (%)"),
         scene2=_merton_plotly_scene(z_title="|erreur| (pts vol)"),
     )
     path = out_dir / f"{file_stem}_iv_and_abs_error_{snapshot_date}.html"
