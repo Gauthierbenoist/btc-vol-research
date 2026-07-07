@@ -39,7 +39,7 @@ def parse_args() -> argparse.Namespace:
         "--weight-scheme",
         type=str,
         default="",
-        help="Ponderation erreur: uniform | vega | volume (defaut: configs/default.yaml merton.weight_scheme)",
+        help="Ponderation erreur: uniform | vega | volume | spread (defaut: configs/default.yaml merton.weight_scheme)",
     )
     p.add_argument(
         "--max-slices",

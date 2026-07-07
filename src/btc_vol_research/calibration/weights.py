@@ -1,4 +1,4 @@
-"""Pondérations de calibration (vega, liquidité, volume) et schémas nommés."""
+"""Pondérations de calibration (vega, liquidité, volume, 1/spread) et schémas nommés."""
 
 from __future__ import annotations
 
@@ -41,6 +41,16 @@ def _volume_series(slice_df: pd.DataFrame) -> np.ndarray:
     if "volume" in slice_df.columns:
         return slice_df["volume"].astype(float).fillna(0).values
     return np.zeros(len(slice_df))
+
+
+def _spread_series(slice_df: pd.DataFrame) -> np.ndarray:
+    """Spread relatif par ligne ; NaN (cote sans bid/ask exploitable) -> spread max de la tranche."""
+    if "rel_spread" not in slice_df.columns:
+        return np.ones(len(slice_df))
+    s = slice_df["rel_spread"].astype(float).values
+    finite = s[np.isfinite(s)]
+    fallback = float(np.max(finite)) if finite.size else 1.0
+    return np.where(np.isfinite(s), s, fallback)
 
 
 def calibration_weights(
@@ -112,6 +122,19 @@ def volume_only_weights(
     return _normalize_weights(np.maximum(w, 1e-8))
 
 
+def spread_only_weights(
+    slice_df: pd.DataFrame,
+    cfg: CalibrationConfig,
+    r: float,
+    q: float,
+) -> np.ndarray:
+    """Poids ∝ 1/spread relatif (normalisés) — cotes serrées = plus fiables."""
+    del cfg, r, q
+    s = _spread_series(slice_df)
+    w = 1.0 / np.maximum(s, 1e-4)
+    return _normalize_weights(w)
+
+
 def build_panel_weights(
     panel: pd.DataFrame,
     weight_fn: WeightFn,
@@ -141,6 +164,7 @@ MERTON_WEIGHT_SCHEMES: tuple[MertonWeightScheme, ...] = (
     MertonWeightScheme("uniform", "sans ponderation", None),
     MertonWeightScheme("vega", "vega", vega_only_weights),
     MertonWeightScheme("volume", "volume", volume_only_weights),
+    MertonWeightScheme("spread", "1/spread", spread_only_weights),
 )
 
 _SCHEME_BY_ID = {s.scheme_id: s for s in MERTON_WEIGHT_SCHEMES}

@@ -39,7 +39,7 @@ heston:
     rho: -0.5
 
 merton:
-  weight_scheme: uniform   # uniform | vega | volume
+  weight_scheme: uniform   # uniform | vega | volume | spread
   sigma: [0.05, 2.0]
   lambda_jump: [0.0, 10.0]
   mu_jump: [-1.0, 1.0]

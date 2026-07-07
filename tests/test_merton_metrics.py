@@ -48,8 +48,32 @@ def test_vega_only_weights_positive():
 def test_merton_weight_schemes_registry():
     from btc_vol_research.calibration.weights import get_merton_weight_scheme
 
-    for sid in ("uniform", "vega", "volume"):
+    for sid in ("uniform", "vega", "volume", "spread"):
         assert get_merton_weight_scheme(sid).scheme_id == sid
+
+
+def test_spread_only_weights_inverse_spread():
+    from btc_vol_research.calibration.weights import spread_only_weights
+
+    df = _toy_panel().iloc[:6].copy()
+    # spread croissant -> poids decroissant (1/spread)
+    df["rel_spread"] = [0.02, 0.04, 0.08, 0.16, 0.32, 0.64]
+    w = spread_only_weights(df, CalibrationConfig(), 0.0, 0.0)
+    assert len(w) == len(df)
+    assert np.all(w > 0)
+    assert abs(w.sum() - len(df)) < 1e-6
+    assert np.all(np.diff(w) < 0)  # spread double -> poids moitie -> strictement decroissant
+    assert abs(w[0] / w[1] - 2.0) < 1e-9  # w ∝ 1/spread
+
+
+def test_spread_weights_nan_gets_lowest_weight():
+    from btc_vol_research.calibration.weights import spread_only_weights
+
+    df = _toy_panel().iloc[:3].copy()
+    df["rel_spread"] = [0.05, 0.10, np.nan]  # NaN -> spread max (0.10) -> poids le plus faible
+    w = spread_only_weights(df, CalibrationConfig(), 0.0, 0.0)
+    assert w[2] == min(w)
+    assert abs(w[2] - w[1]) < 1e-9  # NaN traite comme le spread max observe (0.10)
 
 
 def test_volume_only_weights_positive():
