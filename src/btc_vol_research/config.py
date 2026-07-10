@@ -35,13 +35,15 @@ class MarketConfig:
     min_time_to_expiry_days: float = float(os.getenv("MIN_TIME_TO_EXPIRY_DAYS", "1"))
     max_time_to_expiry_years: float = float(os.getenv("MAX_TIME_TO_EXPIRY_YEARS", "1.0"))
     max_relative_spread: float = float(os.getenv("MAX_REL_SPREAD", "0.5"))
-    min_iv: float = float(os.getenv("MIN_IV", "0.05"))
-    max_iv: float = float(os.getenv("MAX_IV", "4.0"))
+    min_iv: float = float(os.getenv("MIN_IV", "0.01"))
+    max_iv: float = float(os.getenv("MAX_IV", "5.0"))
+    smile_convention: str = "otm"
     drop_phantom_bid_ask: bool = _env_bool("DROP_PHANTOM_BID_ASK", True)
 
 
 @dataclass(frozen=True)
 class CalibrationConfig:
+    atm_zone_half_width: float = float(os.getenv("CALIB_ATM_ZONE_WIDTH", "0.10"))
     use_vega_weight: bool = _env_bool("CALIB_USE_VEGA_WEIGHT", True)
     use_liquidity_weight: bool = _env_bool("CALIB_USE_LIQUIDITY_WEIGHT", True)
     min_strikes_per_slice: int = 5
@@ -76,9 +78,19 @@ class MertonBounds:
 
 
 @dataclass(frozen=True)
+class MertonInitial:
+    sigma: float | None = None
+    lambda_jump: float = 2.0
+    mu_jump: float = -0.35
+    sigma_jump: float = 0.35
+
+
+@dataclass(frozen=True)
 class MertonConfig:
     weight_scheme: str = "uniform"
     bounds: MertonBounds = field(default_factory=MertonBounds)
+    initial: MertonInitial = field(default_factory=MertonInitial)
+    multi_start: bool = True
 
 
 @dataclass(frozen=True)
@@ -144,9 +156,18 @@ def load_config(path: Path | None = None) -> AppConfig:
         mu_jump=tuple(merton_raw.get("mu_jump", [-1.0, 1.0])),
         sigma_jump=tuple(merton_raw.get("sigma_jump", [0.01, 1.0])),
     )
+    initial_raw = merton_raw.get("initial", {})
+    merton_initial = MertonInitial(
+        sigma=initial_raw.get("sigma"),
+        lambda_jump=float(initial_raw.get("lambda_jump", 2.0)),
+        mu_jump=float(initial_raw.get("mu_jump", -0.35)),
+        sigma_jump=float(initial_raw.get("sigma_jump", 0.35)),
+    )
     merton = MertonConfig(
         weight_scheme=str(merton_raw.get("weight_scheme", "uniform")),
         bounds=merton_bounds,
+        initial=merton_initial,
+        multi_start=bool(merton_raw.get("multi_start", True)),
     )
 
     market = MarketConfig(
@@ -156,12 +177,14 @@ def load_config(path: Path | None = None) -> AppConfig:
         min_time_to_expiry_days=float(market_raw.get("min_time_to_expiry_days", 1)),
         max_time_to_expiry_years=float(market_raw.get("max_time_to_expiry_years", 1.0)),
         max_relative_spread=float(market_raw.get("max_relative_spread", 0.5)),
-        min_iv=float(market_raw.get("min_iv", os.getenv("MIN_IV", "0.05"))),
-        max_iv=float(market_raw.get("max_iv", os.getenv("MAX_IV", "4.0"))),
+        min_iv=float(market_raw.get("min_iv", 0.01)),
+        max_iv=float(market_raw.get("max_iv", 5.0)),
+        smile_convention=str(market_raw.get("smile_convention", "otm")),
         drop_phantom_bid_ask=bool(market_raw.get("drop_phantom_bid_ask", True)),
     )
 
     calibration = CalibrationConfig(
+        atm_zone_half_width=float(calib_raw.get("atm_zone_half_width", 0.10)),
         use_vega_weight=bool(calib_raw.get("use_vega_weight", True)),
         use_liquidity_weight=bool(calib_raw.get("use_liquidity_weight", True)),
         min_strikes_per_slice=int(calib_raw.get("min_strikes_per_slice", 5)),

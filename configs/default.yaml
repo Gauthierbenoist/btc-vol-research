@@ -1,5 +1,5 @@
 # Date snapshot (null = dernière disponible dans Neon)
-snapshot_date: null
+snapshot_date: 2026-06-14
 
 market:
   risk_free_rate: 0.0
@@ -8,11 +8,11 @@ market:
   min_time_to_expiry_days: 1
   max_time_to_expiry_years: 1.0
   max_relative_spread: 0.5
-  min_iv: 0.05   # borne basse IV acceptee (calibration + panel)
-  max_iv: 4.0    # borne haute IV acceptee (calibration + panel) — marche BTC court terme peut depasser 300%
+  smile_convention: otm  # otm | calls | puts | all
   drop_phantom_bid_ask: true  # options fantomes : exclure si bid NaN ou ask NaN
 
 calibration:
+  atm_zone_half_width: 0.10   # diagnostics RMSE par zone uniquement
   use_vega_weight: true
   use_liquidity_weight: true
   min_strikes_per_slice: 5
@@ -39,11 +39,18 @@ heston:
     rho: -0.5
 
 merton:
-  weight_scheme: uniform   # uniform | vega | volume | spread
+  weight_scheme: uniform   # uniform | vega | volume
   sigma: [0.05, 2.0]
   lambda_jump: [0.0, 10.0]
-  mu_jump: [-1.0, 1.0]
+  mu_jump: [-2.0, 0.5]
   sigma_jump: [0.01, 1.0]
+  # sigma null = dérivé de l'IV ATM (×0.85)
+  initial:
+    sigma: null
+    lambda_jump: 2.0
+    mu_jump: -0.35
+    sigma_jump: 0.35
+  multi_start: false  # legacy flag, unused with differential_evolution + L-BFGS-B
 
 svi_surface:
   n_moneyness: 50
