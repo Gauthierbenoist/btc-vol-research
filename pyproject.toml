@@ -34,7 +34,8 @@ dependencies = [
     "pyyaml>=6.0",
     "QuantLib>=1.32",
     "plotly>=5.24.0",
-    "lets-be-rational>=1.1.2",
+    "py-vollib>=1.0.1",
+    "py-vollib-vectorized>=0.1.1",
 ]
 
 [project.optional-dependencies]

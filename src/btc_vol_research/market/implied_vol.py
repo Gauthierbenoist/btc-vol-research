@@ -1,34 +1,48 @@
-"""Inversion de volatilité implicite (Peter Jäckel — Let's Be Rational)."""
+"""Inversion de volatilité implicite (Let's Be Rational, vectorisé via py_vollib_vectorized)."""
 
 from __future__ import annotations
 
+import importlib.util
+import sys
+import types
+from pathlib import Path
+
 import numpy as np
-from py_lets_be_rational.exceptions import AboveMaximumException, BelowIntrinsicException
-from py_lets_be_rational.lets_be_rational import implied_volatility_from_a_transformed_rational_guess
 
 
-def _implied_volatility_lbr_scalar(
-    price: float,
-    S: float,
-    K: float,
-    T: float,
-    r: float,
-    q: float,
-    is_call: bool,
-) -> float:
-    """BSM -> forward Black, puis inversion LBR (prix non actualise)."""
-    F = S * np.exp((r - q) * T)
-    undiscounted_price = price * np.exp(r * T)
-    q_flag = 1.0 if is_call else -1.0
-    return float(
-        implied_volatility_from_a_transformed_rational_guess(
-            undiscounted_price,
-            F,
-            K,
-            T,
-            q_flag,
+def _ensure_py_vollib_vectorized_no_jit() -> None:
+    """Charge py_vollib_vectorized sans JIT numba (LBR incompatible avec nopython)."""
+    if "py_vollib_vectorized._iv_models" in sys.modules:
+        return
+
+    spec = importlib.util.find_spec("py_vollib_vectorized")
+    if spec is None or not spec.submodule_search_locations:
+        raise ImportError(
+            "py_vollib_vectorized is required. Install with: pip install py-vollib-vectorized"
         )
-    )
+
+    root = Path(spec.submodule_search_locations[0])
+    for pkg_name, pkg_path in (
+        ("py_vollib_vectorized", root),
+        ("py_vollib_vectorized.util", root / "util"),
+    ):
+        if pkg_name not in sys.modules:
+            mod = types.ModuleType(pkg_name)
+            mod.__path__ = [str(pkg_path)]
+            sys.modules[pkg_name] = mod
+
+    import py_vollib_vectorized.util.jit_helper as jh
+
+    jh.use_jit = False
+
+
+_ensure_py_vollib_vectorized_no_jit()
+from py_vollib_vectorized.implied_volatility import vectorized_implied_volatility  # noqa: E402
+
+
+def _option_type_to_flags(option_type: np.ndarray) -> np.ndarray:
+    is_call = np.char.lower(np.asarray(option_type, dtype=str)) == "call"
+    return np.where(is_call, "c", "p").astype("U1")
 
 
 def implied_volatility(
@@ -43,7 +57,7 @@ def implied_volatility(
     intrinsic_tol: float = 0.999,
 ) -> np.ndarray:
     """
-    Inversion vectorisee via Let's Be Rational (Jäckel).
+    Inversion vectorisee via Let's Be Rational (Jäckel), via py_vollib_vectorized.
 
     Entree/sortie en tableaux numpy de meme longueur ; NaN si inversion impossible.
     """
@@ -64,18 +78,20 @@ def implied_volatility(
     )
     valid &= price >= intrinsic * intrinsic_tol
 
-    for i in np.flatnonzero(valid):
-        try:
-            iv[i] = _implied_volatility_lbr_scalar(
-                float(price[i]),
-                float(S[i]),
-                float(K[i]),
-                float(T[i]),
-                r,
-                q,
-                bool(is_call[i]),
-            )
-        except (BelowIntrinsicException, AboveMaximumException):
-            continue
+    if not np.any(valid):
+        return iv
 
+    flags = _option_type_to_flags(opt[valid])
+    iv[valid] = vectorized_implied_volatility(
+        price[valid],
+        S[valid],
+        K[valid],
+        T[valid],
+        r,
+        flags,
+        q=q,
+        model="black_scholes_merton",
+        return_as="numpy",
+        on_error="ignore",
+    )
     return iv
